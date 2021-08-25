@@ -18,10 +18,9 @@ class Serializer;
 //! Represents a generic expression that returns a table.
 class TableRef {
 public:
-	TableRef(TableReferenceType type) : type(type) {
+	explicit TableRef(TableReferenceType type) : type(type) {
 	}
-	virtual ~TableRef() {
-	}
+	virtual ~TableRef() = default;
 
 	TableReferenceType type;
 	string alias;
@@ -31,7 +30,7 @@ public:
 	virtual string ToString() const {
 		return string();
 	}
-	void Print();
+	void Print() const;
 
 	virtual bool Equals(const TableRef *other) const {
 		return other && type == other->type && alias == other->alias;

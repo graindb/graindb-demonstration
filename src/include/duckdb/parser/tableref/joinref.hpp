@@ -12,12 +12,20 @@
 #include "duckdb/common/unordered_set.hpp"
 #include "duckdb/parser/parsed_expression.hpp"
 #include "duckdb/parser/tableref.hpp"
+#include "duckdb/parser/tableref/edgeref.hpp"
 
 namespace duckdb {
 //! Represents a JOIN between two expressions
 class JoinRef : public TableRef {
 public:
-	JoinRef() : TableRef(TableReferenceType::JOIN) {
+	JoinRef() : TableRef(TableReferenceType::JOIN), type(JoinType::INNER) {
+	}
+	explicit JoinRef(JoinType type) : TableRef(TableReferenceType::JOIN), type(type) {
+	}
+	JoinRef(unique_ptr<TableRef> left, unique_ptr<TableRef> right, unique_ptr<ParsedExpression> condition,
+	        JoinType join_type)
+	    : TableRef(TableReferenceType::JOIN), left(move(left)), right(move(right)), condition(move(condition)),
+	      type(join_type) {
 	}
 
 	//! The left hand side of the join
@@ -30,8 +38,6 @@ public:
 	JoinType type;
 	//! The set of USING columns (if any)
 	vector<string> using_columns;
-	//! The alias
-	string alias;
 
 public:
 	bool Equals(const TableRef *other_) const override;

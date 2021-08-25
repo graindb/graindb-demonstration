@@ -4,26 +4,25 @@
 #include "duckdb/common/serializer/buffered_deserializer.hpp"
 #include "duckdb/common/serializer/buffered_serializer.hpp"
 #include "duckdb/execution/physical_plan_generator.hpp"
+#include "duckdb/main/appender.hpp"
 #include "duckdb/main/database.hpp"
 #include "duckdb/main/materialized_query_result.hpp"
 #include "duckdb/main/query_result.hpp"
+#include "duckdb/main/relation.hpp"
 #include "duckdb/main/stream_query_result.hpp"
 #include "duckdb/optimizer/optimizer.hpp"
-#include "duckdb/parser/parser.hpp"
 #include "duckdb/parser/expression/constant_expression.hpp"
+#include "duckdb/parser/parser.hpp"
 #include "duckdb/parser/statement/drop_statement.hpp"
 #include "duckdb/parser/statement/execute_statement.hpp"
 #include "duckdb/parser/statement/explain_statement.hpp"
 #include "duckdb/parser/statement/prepare_statement.hpp"
+#include "duckdb/parser/statement/relation_statement.hpp"
 #include "duckdb/planner/operator/logical_execute.hpp"
 #include "duckdb/planner/planner.hpp"
-#include "duckdb/transaction/transaction_manager.hpp"
-#include "duckdb/transaction/transaction.hpp"
 #include "duckdb/storage/data_table.hpp"
-#include "duckdb/main/appender.hpp"
-#include "duckdb/main/relation.hpp"
-#include "duckdb/planner/expression_binder/where_binder.hpp"
-#include "duckdb/parser/statement/relation_statement.hpp"
+#include "duckdb/transaction/transaction.hpp"
+#include "duckdb/transaction/transaction_manager.hpp"
 
 #include <iostream>
 
@@ -192,7 +191,7 @@ unique_ptr<PreparedStatementData> ClientContext::CreatePreparedStatement(const s
 	PhysicalPlanGenerator physical_planner(*this);
 	auto physical_plan = physical_planner.CreatePlan(move(plan));
 	profiler.EndPhase();
-	//cout << physical_plan->ToString() << endl;
+	// cout << physical_plan->ToString() << endl;
 
 	result->dependencies = move(physical_planner.dependencies);
 	result->types = physical_plan->types;
@@ -202,8 +201,8 @@ unique_ptr<PreparedStatementData> ClientContext::CreatePreparedStatement(const s
 
 unique_ptr<QueryResult> ClientContext::ExecutePreparedStatement(const string &query, PreparedStatementData &statement,
                                                                 vector<Value> bound_values, bool allow_stream_result) {
-//	Profiler stmt_profiler;
-//	stmt_profiler.Start();
+	//	Profiler stmt_profiler;
+	//	stmt_profiler.Start();
 	if (ActiveTransaction().is_invalidated && statement.requires_valid_transaction) {
 		throw Exception("Current transaction is aborted (please ROLLBACK)");
 	}
@@ -247,8 +246,8 @@ unique_ptr<QueryResult> ClientContext::ExecutePreparedStatement(const string &qu
 #endif
 		result->collection.Append(*chunk);
 	}
-//	stmt_profiler.End();
-//	result->time = stmt_profiler.Elapsed();
+	//	stmt_profiler.End();
+	//	result->time = stmt_profiler.Elapsed();
 	return move(result);
 }
 
@@ -261,7 +260,7 @@ void ClientContext::InitialCleanup() {
 	interrupted = false;
 }
 
-unique_ptr<PreparedStatement> ClientContext::Prepare(string query) {
+unique_ptr<PreparedStatement> ClientContext::Prepare(const string &query) {
 	lock_guard<mutex> client_guard(context_lock);
 	// prepare the query
 	try {
@@ -269,8 +268,8 @@ unique_ptr<PreparedStatement> ClientContext::Prepare(string query) {
 
 		// first parse the query
 		Parser parser;
-		parser.ParseQuery(query.c_str());
-		if (parser.statements.size() == 0) {
+		parser.ParseQuery(query);
+		if (parser.statements.empty()) {
 			throw Exception("No statement to prepare!");
 		}
 		if (parser.statements.size() > 1) {
@@ -300,7 +299,7 @@ unique_ptr<PreparedStatement> ClientContext::Prepare(string query) {
 }
 
 unique_ptr<QueryResult> ClientContext::Execute(string name, vector<Value> &values, bool allow_stream_result,
-                                               string query) {
+                                               const string &query) {
 	lock_guard<mutex> client_guard(context_lock);
 	try {
 		InitialCleanup();
@@ -310,7 +309,7 @@ unique_ptr<QueryResult> ClientContext::Execute(string name, vector<Value> &value
 
 	// create the execute statement
 	auto execute = make_unique<ExecuteStatement>();
-	execute->name = name;
+	execute->name = move(name);
 	for (auto &val : values) {
 		execute->values.push_back(make_unique<ConstantExpression>(val.GetSQLType(), val));
 	}
@@ -428,19 +427,18 @@ unique_ptr<QueryResult> ClientContext::RunStatements(const string &query, vector
 	return result;
 }
 
-unique_ptr<QueryResult> ClientContext::Query(string query, bool allow_stream_result) {
+unique_ptr<QueryResult> ClientContext::Query(const string &query, bool allow_stream_result) {
 	lock_guard<mutex> client_guard(context_lock);
-
 	Parser parser;
 	try {
 		InitialCleanup();
 		// parse the query and transform it into a set of statements
-		parser.ParseQuery(query.c_str());
+		parser.ParseQuery(query);
 	} catch (std::exception &ex) {
 		return make_unique<MaterializedQueryResult>(ex.what());
 	}
 
-	if (parser.statements.size() == 0) {
+	if (parser.statements.empty()) {
 		// no statements, return empty successful result
 		return make_unique<MaterializedQueryResult>(StatementType::INVALID_STATEMENT);
 	}
@@ -485,7 +483,7 @@ void ClientContext::Invalidate() {
 	appenders.clear();
 }
 
-string ClientContext::VerifyQuery(string query, unique_ptr<SQLStatement> statement) {
+string ClientContext::VerifyQuery(const string &query, unique_ptr<SQLStatement> statement) {
 	assert(statement->type == StatementType::SELECT_STATEMENT);
 	// aggressive query verification
 
@@ -665,7 +663,7 @@ unique_ptr<TableDescription> ClientContext::TableInfo(string schema_name, string
 		result->schema = schema_name;
 		result->table = table_name;
 		for (auto &column : table->columns) {
-			result->columns.push_back(ColumnDefinition(column.name, column.type));
+			result->columns.emplace_back(column.name, column.type);
 		}
 	});
 	return result;
@@ -694,12 +692,12 @@ void ClientContext::TryBindRelation(Relation &relation, vector<ColumnDefinition>
 		auto result = relation.Bind(binder);
 		assert(result.names.size() == result.types.size());
 		for (idx_t i = 0; i < result.names.size(); i++) {
-			result_columns.push_back(ColumnDefinition(result.names[i], result.types[i]));
+			result_columns.emplace_back(result.names[i], result.types[i]);
 		}
 	});
 }
 
-unique_ptr<QueryResult> ClientContext::Execute(shared_ptr<Relation> relation) {
+unique_ptr<QueryResult> ClientContext::Execute(const shared_ptr<Relation> &relation) {
 	string query;
 	if (query_verification_enabled) {
 		// run the ToString method of any relation we run, mostly to ensure it doesn't crash

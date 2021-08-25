@@ -8,6 +8,11 @@ public:
 	PhysicalChunkScanState() : PhysicalOperatorState(nullptr), chunk_index(0) {
 	}
 
+	void Reset() override {
+		PhysicalOperatorState::Reset();
+		chunk_index = 0;
+	}
+
 	//! The current position in the scan
 	idx_t chunk_index;
 };
@@ -19,7 +24,7 @@ void PhysicalChunkScan::GetChunkInternal(ClientContext &context, DataChunk &chun
 	if (collection->count == 0) {
 		return;
 	}
-	assert(chunk.GetTypes() == collection->types);
+	// assert(chunk.GetTypes() == collection->types);
 	if (state->chunk_index >= collection->chunks.size()) {
 		return;
 	}

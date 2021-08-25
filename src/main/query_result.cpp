@@ -4,16 +4,18 @@ using namespace duckdb;
 using namespace std;
 
 QueryResult::QueryResult(QueryResultType type, StatementType statement_type)
-    : type(type), statement_type(statement_type), success(true) {
+    : type(type), statement_type(statement_type), success(true), time(0.0) {
 }
 
 QueryResult::QueryResult(QueryResultType type, StatementType statement_type, vector<SQLType> sql_types,
                          vector<TypeId> types, vector<string> names)
-    : type(type), statement_type(statement_type), sql_types(sql_types), types(types), names(names), success(true) {
+    : type(type), statement_type(statement_type), sql_types(move(sql_types)), types(move(types)), names(move(names)),
+      success(true), time(0.0) {
 	assert(types.size() == names.size());
 }
 
-QueryResult::QueryResult(QueryResultType type, string error) : type(type), success(false), error(error) {
+QueryResult::QueryResult(QueryResultType type, string error)
+    : type(type), statement_type(StatementType::INVALID_STATEMENT), success(false), error(move(error)), time(0.0) {
 }
 
 bool QueryResult::Equals(QueryResult &other) {
@@ -66,8 +68,8 @@ string QueryResult::HeaderToString() {
 		result += name + "\t";
 	}
 	result += "\n";
-	for (auto &type : sql_types) {
-		result += SQLTypeToString(type) + "\t";
+	for (auto &_type : sql_types) {
+		result += SQLTypeToString(_type) + "\t";
 	}
 	result += "\n";
 	return result;

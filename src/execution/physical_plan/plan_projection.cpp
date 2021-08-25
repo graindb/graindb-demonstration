@@ -1,3 +1,4 @@
+#include "duckdb/execution/operator/join/physical_adjacency_join.hpp"
 #include "duckdb/execution/operator/projection/physical_projection.hpp"
 #include "duckdb/execution/physical_plan_generator.hpp"
 #include "duckdb/planner/expression/bound_reference_expression.hpp"

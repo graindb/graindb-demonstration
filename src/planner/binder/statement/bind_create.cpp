@@ -1,15 +1,18 @@
 #include "duckdb/catalog/catalog.hpp"
 #include "duckdb/catalog/catalog_entry/schema_catalog_entry.hpp"
+#include "duckdb/parser/parsed_data/create_edge_info.hpp"
 #include "duckdb/parser/parsed_data/create_index_info.hpp"
-#include "duckdb/parser/parsed_data/create_rai_info.hpp"
+#include "duckdb/parser/parsed_data/create_vertex_info.hpp"
 #include "duckdb/parser/parsed_data/create_view_info.hpp"
 #include "duckdb/parser/statement/create_statement.hpp"
 #include "duckdb/planner/binder.hpp"
 #include "duckdb/planner/bound_query_node.hpp"
 #include "duckdb/planner/expression_binder/index_binder.hpp"
 #include "duckdb/planner/operator/logical_create.hpp"
+#include "duckdb/planner/operator/logical_create_edge.hpp"
 #include "duckdb/planner/operator/logical_create_index.hpp"
 #include "duckdb/planner/operator/logical_create_table.hpp"
+#include "duckdb/planner/operator/logical_create_vertex.hpp"
 #include "duckdb/planner/operator/logical_get.hpp"
 #include "duckdb/planner/tableref/bound_basetableref.hpp"
 
@@ -118,9 +121,23 @@ BoundStatement Binder::Bind(CreateStatement &stmt) {
 		result.plan = move(create_table);
 		return result;
 	}
-	case CatalogType::RAI: {
-		auto bound_info = BindCreateRAIInfo(move(stmt.info));
-		result.plan = move(bound_info->plan);
+	case CatalogType::VERTEX: {
+		auto bound_info = BindCreateVertexInfo(move(stmt.info));
+
+		// create the logical operator
+		auto create_vertex = make_unique<LogicalCreateVertex>(bound_info->schema, move(bound_info));
+		result.plan = move(create_vertex);
+		return result;
+	}
+	case CatalogType::EDGE: {
+		auto bound_info = BindCreateEdgeInfo(move(stmt.info));
+		assert(bound_info->query_node.plan);
+
+		// create the logical operator
+		auto sub_plan = move(bound_info->query_node.plan);
+		auto create_edge = make_unique<LogicalCreateEdge>(bound_info->schema, move(bound_info));
+		create_edge->children.push_back(move(sub_plan));
+		result.plan = move(create_edge);
 		return result;
 	}
 	default:

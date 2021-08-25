@@ -42,5 +42,4 @@
 %type <ival> key_match
 %type <node> TableLikeClause
 %type <ival> OptTemp
-%type <ival> OptDirection
 %type <ival> generated_when

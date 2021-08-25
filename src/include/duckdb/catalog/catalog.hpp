@@ -18,6 +18,8 @@ namespace duckdb {
 struct CreateSchemaInfo;
 struct DropInfo;
 struct BoundCreateTableInfo;
+struct BoundCreateVertexInfo;
+struct BoundCreateEdgeInfo;
 struct AlterTableInfo;
 struct CreateTableFunctionInfo;
 struct CreateFunctionInfo;
@@ -39,7 +41,7 @@ class StorageManager;
 //! The Catalog object represents the catalog of the database.
 class Catalog {
 public:
-	Catalog(StorageManager &storage);
+	explicit Catalog(StorageManager &storage);
 
 	//! Reference to the storage manager
 	StorageManager &storage;
@@ -58,6 +60,10 @@ public:
 	CatalogEntry *CreateSchema(ClientContext &context, CreateSchemaInfo *info);
 	//! Creates a table in the catalog.
 	CatalogEntry *CreateTable(ClientContext &context, BoundCreateTableInfo *info);
+	//! Creates a vertex in the catalog.
+	CatalogEntry *CreateVertex(ClientContext &context, BoundCreateVertexInfo *info);
+	//! Creates an edge in the catalog.
+	CatalogEntry *CreateEdge(ClientContext &context, BoundCreateEdgeInfo *info);
 	//! Create a table function in the catalog
 	CatalogEntry *CreateTableFunction(ClientContext &context, CreateTableFunctionInfo *info);
 	//! Create a scalar or aggregate function in the catalog

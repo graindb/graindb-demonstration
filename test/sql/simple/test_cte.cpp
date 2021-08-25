@@ -18,7 +18,7 @@ TEST_CASE("Test Common Table Expressions (CTE)", "[cte]") {
 
 	result = con.Query("with cte1 as (Select i as j from a), cte2 as (select "
 	                   "ref.j as k from cte1 as ref), cte3 as (select ref2.j+1 "
-	                   "as i from cte1 as ref2) select * from cte2 , cte3;");
+	                   "as i from cte1 as ref2) select k, i from cte2 , cte3;");
 	REQUIRE(CHECK_COLUMN(result, 0, {42}));
 	REQUIRE(CHECK_COLUMN(result, 1, {43}));
 
@@ -63,7 +63,7 @@ TEST_CASE("Test Recursive Common Table Expressions UNION ALL (CTE)", "[rec_cte_u
 	    con.Query("with recursive t as (select 1 as x union all select x+1 from t as m where m.x < 3) select * from t");
 	REQUIRE(CHECK_COLUMN(result, 0, {1, 2, 3}));
 
-	// recursive CTE with multiple references and aliases
+	// recursive CTE with multiple vertex_expressions and aliases
 	result = con.Query("with recursive t as (select 1 as x union all select m.x+f.x from t as m, t as f where m.x < 3) "
 	                   "select * from t");
 	REQUIRE(CHECK_COLUMN(result, 0, {1, 2, 4}));
@@ -139,7 +139,7 @@ TEST_CASE("Test Recursive Common Table Expressions UNION (CTE)", "[rec_cte_union
 	    "with recursive t as (select 1 as x union select x+1 from t as m where m.x < 3) select * from t order by x");
 	REQUIRE(CHECK_COLUMN(result, 0, {1, 2, 3}));
 
-	// recursive CTE with multiple references and aliases
+	// recursive CTE with multiple vertex_expressions and aliases
 	result = con.Query("with recursive t as (select 1 as x union select m.x+f.x from t as m, t as f where m.x < 3) "
 	                   "select * from t order by x");
 	REQUIRE(CHECK_COLUMN(result, 0, {1, 2, 4}));

@@ -11,7 +11,7 @@ using namespace std;
 class PhysicalSimpleAggregateOperatorState : public PhysicalOperatorState {
 public:
 	PhysicalSimpleAggregateOperatorState(PhysicalSimpleAggregate *parent, PhysicalOperator *child);
-	~PhysicalSimpleAggregateOperatorState() {
+	~PhysicalSimpleAggregateOperatorState() override {
 		assert(destructors.size() == aggregates.size());
 		for (idx_t i = 0; i < destructors.size(); i++) {
 			if (!destructors[i]) {
@@ -34,7 +34,8 @@ public:
 	DataChunk payload_chunk;
 };
 
-PhysicalSimpleAggregate::PhysicalSimpleAggregate(vector<TypeId> types, vector<unique_ptr<Expression>> expressions)
+PhysicalSimpleAggregate::PhysicalSimpleAggregate(const vector<TypeId> &types,
+                                                 vector<unique_ptr<Expression>> expressions)
     : PhysicalOperator(PhysicalOperatorType::SIMPLE_AGGREGATE, types), aggregates(move(expressions)) {
 }
 
@@ -58,7 +59,7 @@ void PhysicalSimpleAggregate::GetChunkInternal(ClientContext &context, DataChunk
 			auto &aggregate = (BoundAggregateExpression &)*aggregates[aggr_idx];
 			idx_t payload_cnt = 0;
 			// resolve the child expression of the aggregate (if any)
-			if (aggregate.children.size() > 0) {
+			if (!aggregate.children.empty()) {
 				for (idx_t i = 0; i < aggregate.children.size(); ++i) {
 					state->child_executor.ExecuteExpression(payload_expr_idx,
 					                                        payload_chunk.data[payload_idx + payload_cnt]);
@@ -97,7 +98,7 @@ PhysicalSimpleAggregateOperatorState::PhysicalSimpleAggregateOperatorState(Physi
 		assert(aggregate->GetExpressionClass() == ExpressionClass::BOUND_AGGREGATE);
 		auto &aggr = (BoundAggregateExpression &)*aggregate;
 		// initialize the payload chunk
-		if (aggr.children.size()) {
+		if (!aggr.children.empty()) {
 			for (idx_t i = 0; i < aggr.children.size(); ++i) {
 				payload_types.push_back(aggr.children[i]->return_type);
 				child_executor.AddExpression(*aggr.children[i]);

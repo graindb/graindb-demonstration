@@ -15,7 +15,8 @@ using SIPScanStructure = SIPHashTable::SIPScanStructure;
 SIPHashTable::SIPHashTable(BufferManager &buffer_manager, vector<JoinCondition> &conditions, vector<TypeId> build_types,
                            JoinType join_type)
     : buffer_manager(buffer_manager), build_types(move(build_types)), equality_size(0), condition_size(0),
-      build_size(0), entry_size(0), tuple_size(0), join_type(join_type), finalized(false), has_null(false), count(0) {
+      build_size(0), entry_size(0), tuple_size(0), join_type(join_type), finalized(false), has_null(false), bitmask(0),
+      initialized(false), count(0) {
 	for (auto &condition : conditions) {
 		assert(condition.left->return_type == condition.right->return_type);
 		auto type = condition.left->return_type;
@@ -69,28 +70,28 @@ SIPHashTable::~SIPHashTable() {
 	}
 }
 
-void SIPHashTable::ApplyBitmask(Vector &hashes, idx_t count) const {
+void SIPHashTable::ApplyBitmask(Vector &hashes, idx_t count_) const {
 	if (hashes.vector_type == VectorType::CONSTANT_VECTOR) {
 		assert(!ConstantVector::IsNull(hashes));
 		auto indices = ConstantVector::GetData<hash_t>(hashes);
 		*indices = *indices & bitmask;
 	} else {
-		hashes.Normalify(count);
+		hashes.Normalify(count_);
 		auto indices = FlatVector::GetData<hash_t>(hashes);
-		for (idx_t i = 0; i < count; i++) {
+		for (idx_t i = 0; i < count_; i++) {
 			indices[i] &= bitmask;
 		}
 	}
 }
 
-void SIPHashTable::ApplyBitmask(Vector &hashes, const SelectionVector &sel, idx_t count, Vector &pointers) {
+void SIPHashTable::ApplyBitmask(Vector &hashes, const SelectionVector &sel, idx_t count_, Vector &pointers) const {
 	VectorData hdata;
-	hashes.Orrify(count, hdata);
+	hashes.Orrify(count_, hdata);
 
 	auto hash_data = (hash_t *)hdata.data;
 	auto result_data = FlatVector::GetData<data_ptr_t *>(pointers);
 	auto main_ht = (data_ptr_t *)hash_map->node->buffer;
-	for (idx_t i = 0; i < count; i++) {
+	for (idx_t i = 0; i < count_; i++) {
 		auto rindex = sel.get_index(i);
 		auto hindex = hdata.sel->get_index(rindex);
 		auto hash = hash_data[hindex];
@@ -98,23 +99,8 @@ void SIPHashTable::ApplyBitmask(Vector &hashes, const SelectionVector &sel, idx_
 	}
 }
 
-void SIPHashTable::ApplyKeymask(Vector &keys, const SelectionVector &sel, idx_t count, Vector &pointers) {
-	VectorData kdata;
-	keys.Orrify(count, kdata);
-
-	auto key_data = (hash_t *)kdata.data;
-	auto result_data = FlatVector::GetData<data_ptr_t *>(pointers);
-	auto main_ht = (data_ptr_t *)hash_map->node->buffer;
-	for (idx_t i = 0; i < count; i++) {
-		auto rindex = sel.get_index(i);
-		auto kindex = kdata.sel->get_index(rindex);
-		auto key = key_data[kindex];
-		result_data[rindex] = main_ht + key;
-	}
-}
-
-void SIPHashTable::Hash(DataChunk &keys, const SelectionVector &sel, idx_t count, Vector &hashes) const {
-	if (count == keys.size()) {
+void SIPHashTable::Hash(DataChunk &keys, const SelectionVector &sel, idx_t count_, Vector &hashes) const {
+	if (count_ == keys.size()) {
 		// no null values are filtered: use regular hash functions
 		VectorOperations::Hash(keys.data[0], hashes, keys.size());
 		for (idx_t i = 1; i < equality_types.size(); i++) {
@@ -122,9 +108,9 @@ void SIPHashTable::Hash(DataChunk &keys, const SelectionVector &sel, idx_t count
 		}
 	} else {
 		// null values were filtered: use selection vector
-		VectorOperations::Hash(keys.data[0], hashes, sel, count);
+		VectorOperations::Hash(keys.data[0], hashes, sel, count_);
 		for (idx_t i = 1; i < equality_types.size(); i++) {
-			VectorOperations::CombineHash(hashes, keys.data[i], sel, count);
+			VectorOperations::CombineHash(hashes, keys.data[i], sel, count_);
 		}
 	}
 }
@@ -158,35 +144,35 @@ static void sip_templated_serialize_vdata(VectorData &vdata, const SelectionVect
 	}
 }
 
-void SIPHashTable::SerializeVectorData(VectorData &vdata, TypeId type, const SelectionVector &sel, idx_t count,
+void SIPHashTable::SerializeVectorData(VectorData &vdata, TypeId type, const SelectionVector &sel, idx_t count_,
                                        data_ptr_t key_locations[]) {
 	switch (type) {
 	case TypeId::BOOL:
 	case TypeId::INT8:
-		sip_templated_serialize_vdata<int8_t>(vdata, sel, count, key_locations);
+		sip_templated_serialize_vdata<int8_t>(vdata, sel, count_, key_locations);
 		break;
 	case TypeId::INT16:
-		sip_templated_serialize_vdata<int16_t>(vdata, sel, count, key_locations);
+		sip_templated_serialize_vdata<int16_t>(vdata, sel, count_, key_locations);
 		break;
 	case TypeId::INT32:
-		sip_templated_serialize_vdata<int32_t>(vdata, sel, count, key_locations);
+		sip_templated_serialize_vdata<int32_t>(vdata, sel, count_, key_locations);
 		break;
 	case TypeId::INT64:
-		sip_templated_serialize_vdata<int64_t>(vdata, sel, count, key_locations);
+		sip_templated_serialize_vdata<int64_t>(vdata, sel, count_, key_locations);
 		break;
 	case TypeId::FLOAT:
-		sip_templated_serialize_vdata<float>(vdata, sel, count, key_locations);
+		sip_templated_serialize_vdata<float>(vdata, sel, count_, key_locations);
 		break;
 	case TypeId::DOUBLE:
-		sip_templated_serialize_vdata<double>(vdata, sel, count, key_locations);
+		sip_templated_serialize_vdata<double>(vdata, sel, count_, key_locations);
 		break;
 	case TypeId::HASH:
-		sip_templated_serialize_vdata<hash_t>(vdata, sel, count, key_locations);
+		sip_templated_serialize_vdata<hash_t>(vdata, sel, count_, key_locations);
 		break;
 	case TypeId::VARCHAR: {
 		StringHeap local_heap;
 		auto source = (string_t *)vdata.data;
-		for (idx_t i = 0; i < count; i++) {
+		for (idx_t i = 0; i < count_; i++) {
 			auto idx = sel.get_index(i);
 			auto source_idx = vdata.sel->get_index(idx);
 
@@ -209,19 +195,19 @@ void SIPHashTable::SerializeVectorData(VectorData &vdata, TypeId type, const Sel
 	}
 }
 
-void SIPHashTable::SerializeVector(Vector &v, idx_t vcount, const SelectionVector &sel, idx_t count,
+void SIPHashTable::SerializeVector(Vector &v, idx_t vcount, const SelectionVector &sel, idx_t count_,
                                    data_ptr_t key_locations[]) {
 	VectorData vdata;
 	v.Orrify(vcount, vdata);
 
-	SerializeVectorData(vdata, v.type, sel, count, key_locations);
+	SerializeVectorData(vdata, v.type, sel, count_, key_locations);
 }
 
 idx_t SIPHashTable::AppendToBlock(HTDataBlock &block, BufferHandle &handle, vector<BlockAppendEntry> &append_entries,
                                   idx_t remaining) const {
 	idx_t append_count = std::min(remaining, block.capacity - block.count);
-	auto dataptr = handle.node->buffer + block.count * entry_size;
-	append_entries.emplace_back(dataptr, append_count);
+	auto data_ptr = handle.node->buffer + block.count * entry_size;
+	append_entries.emplace_back(data_ptr, append_count);
 	block.count += append_count;
 	return append_count;
 }
@@ -259,11 +245,8 @@ idx_t SIPHashTable::PrepareKeys(DataChunk &keys, unique_ptr<VectorData[]> &key_d
 	return added_count;
 }
 
-void SIPHashTable::Initialize() {
-}
-
 void SIPHashTable::Build(DataChunk &keys, DataChunk &payload) {
-	assert(!finalized);
+	// assert(!finalized);
 	assert(keys.size() == payload.size());
 	if (keys.size() == 0) {
 		return;
@@ -334,8 +317,8 @@ void SIPHashTable::Build(DataChunk &keys, DataChunk &payload) {
 	for (auto &append_entry : append_entries) {
 		idx_t next = append_idx + append_entry.count;
 		for (; append_idx < next; append_idx++) {
-			key_locations[append_idx] = append_entry.baseptr;
-			append_entry.baseptr += entry_size;
+			key_locations[append_idx] = append_entry.base_ptr;
+			append_entry.base_ptr += entry_size;
 		}
 	}
 
@@ -376,17 +359,17 @@ void SIPHashTable::Build(DataChunk &keys, DataChunk &payload) {
 #endif
 }
 
-void SIPHashTable::InsertHashes(Vector &hashes, idx_t count, data_ptr_t key_locations[]) {
+void SIPHashTable::InsertHashes(Vector &hashes, idx_t num, data_ptr_t key_locations[]) {
 	assert(hashes.type == TypeId::HASH);
 
 	// use bitmask to get position in array
-	ApplyBitmask(hashes, count);
-	hashes.Normalify(count);
+	ApplyBitmask(hashes, num);
+	hashes.Normalify(num);
 
 	assert(hashes.vector_type == VectorType::FLAT_VECTOR);
 	auto pointers = (data_ptr_t *)hash_map->node->buffer;
 	auto indices = FlatVector::GetData<hash_t>(hashes);
-	for (idx_t i = 0; i < count; i++) {
+	for (idx_t i = 0; i < num; i++) {
 		auto index = indices[i];
 		// set prev in current key to the value (NOTE: this will be nullptr if
 		// there is none)
@@ -442,20 +425,15 @@ void SIPHashTable::Finalize() {
 	finalized = true;
 }
 
-void SIPHashTable::GenerateBitmaskFilter(RAIInfo &rai_info, bool use_alist) {
+void SIPHashTable::GenerateBitmaskFilter(RelAdjIndexInfo &rai_info, bool use_alists) {
 	// initialize bitmask filters
-	auto zone_size = (rai_info.left_cardinalities[0] / STANDARD_VECTOR_SIZE) + 1;
+	auto zone_size = (rai_info.cardinality / STANDARD_VECTOR_SIZE) + 1;
 	rai_info.row_bitmask = make_unique<bitmask_vector>(zone_size * STANDARD_VECTOR_SIZE);
 	rai_info.zone_bitmask = make_unique<bitmask_vector>(zone_size);
-	if (rai_info.passing_tables[1] != 0) {
-		auto extra_zone_size = (rai_info.left_cardinalities[1] / STANDARD_VECTOR_SIZE) + 1;
-		rai_info.extra_row_bitmask = make_unique<bitmask_vector>(extra_zone_size * STANDARD_VECTOR_SIZE);
-		rai_info.extra_zone_bitmask = make_unique<bitmask_vector>(extra_zone_size);
-	}
 	// fill bitmask filters
 	Vector keys(TypeId::INT64);
 	auto key_data = FlatVector::GetData<int64_t>(keys);
-	if (use_alist) {
+	if (use_alists) {
 		for (idx_t blockId = 0; blockId < blocks.size(); blockId++) {
 			auto block = blocks[blockId];
 			auto handle = finalize_pinned_handles[blockId].get();
@@ -494,97 +472,86 @@ void SIPHashTable::GenerateBitmaskFilter(RAIInfo &rai_info, bool use_alist) {
 	}
 }
 
-void SIPHashTable::FinalizeWithFilter(RAIInfo &rai_info) {
-	// the build has finished, now iterate over all the nodes and construct the final hash table
-	// decide here to use the dense-ID HT or stick to the regular HT
-	// select a HT that has at least 50% empty space
-	idx_t capacity = NextPowerOfTwo(std::max(count * 2, (idx_t)(Storage::BLOCK_ALLOC_SIZE / sizeof(data_ptr_t)) + 1));
-	// size needs to be a power of 2
-	assert((capacity & (capacity - 1)) == 0);
-	bitmask = capacity - 1;
+// void SIPHashTable::FinalizeWithFilter(RAIInfo &rai_info) {
+//	// the build has finished, now iterate over all the nodes and construct the final hash table
+//	// decide here to use the dense-ID HT or stick to the regular HT
+//	// select a HT that has at least 50% empty space
+//	idx_t capacity = NextPowerOfTwo(std::max(count * 2, (idx_t)(Storage::BLOCK_ALLOC_SIZE / sizeof(data_ptr_t)) + 1));
+//	// size needs to be a power of 2
+//	assert((capacity & (capacity - 1)) == 0);
+//	bitmask = capacity - 1;
+//
+//	// allocate the HT and initialize it with all-zero entries
+//	hash_map = buffer_manager.Allocate(capacity * sizeof(data_ptr_t));
+//	memset(hash_map->node->buffer, 0, capacity * sizeof(data_ptr_t));
+//
+//	Vector hashes(TypeId::HASH);
+//	Vector keys(TypeId::INT64);
+//	auto hash_data = FlatVector::GetData<hash_t>(hashes);
+//	auto key_data = FlatVector::GetData<int64_t>(keys);
+//	data_ptr_t key_locations[STANDARD_VECTOR_SIZE];
+//	// now construct the actual hash table; scan the nodes
+//	// as we can the nodes we pin all the blocks of the HT and keep them pinned until the HT is destroyed
+//	// this is so that we can keep pointers around to the blocks
+//	for (auto &block : blocks) {
+//		auto handle = buffer_manager.Pin(block.block_id);
+//		data_ptr_t dataptr = handle->node->buffer;
+//		idx_t entry = 0;
+//		while (entry < block.count) {
+//			// fetch the next vector of entries from the blocks
+//			idx_t next = std::min((idx_t)STANDARD_VECTOR_SIZE, block.count - entry);
+//			for (idx_t i = 0; i < next; i++) {
+//				key_data[i] = Load<int64_t>((data_ptr_t)dataptr);
+//				hash_data[i] = Load<hash_t>((data_ptr_t)(dataptr + tuple_size));
+//				key_locations[i] = dataptr;
+//				dataptr += entry_size;
+//			}
+//			// now insert into the hash table
+//			InsertHashes(hashes, next, key_locations);
+//			// now generate semi-join filter
+//
+//			entry += next;
+//		}
+//		finalize_pinned_handles.push_back(move(handle));
+//	}
+//	GenerateBitmaskFilter(rai_info, false);
+//	finalized = true;
+//}
 
-	// allocate the HT and initialize it with all-zero entries
-	hash_map = buffer_manager.Allocate(capacity * sizeof(data_ptr_t));
-	memset(hash_map->node->buffer, 0, capacity * sizeof(data_ptr_t));
-
-	Vector hashes(TypeId::HASH);
-	Vector keys(TypeId::INT64);
-	auto hash_data = FlatVector::GetData<hash_t>(hashes);
-	auto key_data = FlatVector::GetData<int64_t>(keys);
-	data_ptr_t key_locations[STANDARD_VECTOR_SIZE];
-	// now construct the actual hash table; scan the nodes
-	// as we can the nodes we pin all the blocks of the HT and keep them pinned until the HT is destroyed
-	// this is so that we can keep pointers around to the blocks
-	for (auto &block : blocks) {
-		auto handle = buffer_manager.Pin(block.block_id);
-		data_ptr_t dataptr = handle->node->buffer;
-		idx_t entry = 0;
-		while (entry < block.count) {
-			// fetch the next vector of entries from the blocks
-			idx_t next = std::min((idx_t)STANDARD_VECTOR_SIZE, block.count - entry);
-			for (idx_t i = 0; i < next; i++) {
-				key_data[i] = Load<int64_t>((data_ptr_t)dataptr);
-				hash_data[i] = Load<hash_t>((data_ptr_t)(dataptr + tuple_size));
-				key_locations[i] = dataptr;
-				dataptr += entry_size;
-			}
-			// now insert into the hash table
-			InsertHashes(hashes, next, key_locations);
-			// now generate semi-join filter
-
-			entry += next;
-		}
-		finalize_pinned_handles.push_back(move(handle));
-	}
-	GenerateBitmaskFilter(rai_info, false);
-	finalized = true;
-}
-
-void SIPHashTable::FillBitmaskWithAList(Vector &key_vector, idx_t count, RAIInfo &rai_info) {
+void SIPHashTable::FillBitmaskWithAList(Vector &key_vector, idx_t count, RelAdjIndexInfo &rai_info) {
 	VectorData key_data;
 	key_vector.Orrify(count, key_data);
 	auto *keys = (int64_t *)key_data.data;
-	auto key_nullmask = *key_data.nullmask;
 	auto &row_bitmask = *rai_info.row_bitmask;
 	auto &zone_bitmask = *rai_info.zone_bitmask;
 
-	auto compact_list = rai_info.compact_list;
-	if (rai_info.passing_tables[1] == 0) {
+	auto compact_list = rai_info.alists;
+	if (!rai_info.extended_vertex_passing) {
 		for (idx_t i = 0; i < count; i++) {
 			idx_t pos = key_data.sel->get_index(i);
-			auto offset = compact_list->offsets[keys[pos]];
-			auto size = compact_list->sizes[keys[pos]];
-			for (idx_t j = 0; j < size; j++) {
-				auto id = compact_list->edges[offset + j];
+			auto list = compact_list->GetAList(keys[pos]);
+			for (idx_t j = 0; j < list.numElements; j++) {
+				auto id = list.edge_list[j];
 				row_bitmask[id] = true;
 				auto zone_id = id / STANDARD_VECTOR_SIZE;
 				zone_bitmask[zone_id] = true;
 			}
 		}
 	} else {
-		auto &extra_zone_filter = *rai_info.extra_row_bitmask;
-		auto &extra_zone_sel = *rai_info.extra_zone_bitmask;
 		for (idx_t i = 0; i < count; i++) {
 			idx_t pos = key_data.sel->get_index(i);
-			auto offset = compact_list->offsets[keys[pos]];
-			auto size = compact_list->sizes[keys[pos]];
-			for (idx_t j = 0; j < size; j++) {
-				auto id = compact_list->edges[offset + j];
+			auto list = compact_list->GetAList(keys[pos]);
+			for (idx_t j = 0; j < list.numElements; j++) {
+				auto id = list.vertex_list[j];
 				row_bitmask[id] = true;
 				auto zone_id = id / STANDARD_VECTOR_SIZE;
 				zone_bitmask[zone_id] = true;
-			}
-			for (idx_t j = 0; j < size; j++) {
-				auto id = compact_list->vertices[offset + j];
-				extra_zone_filter[id] = true;
-				auto zone_id = id / STANDARD_VECTOR_SIZE;
-				extra_zone_sel[zone_id] = true;
 			}
 		}
 	}
 }
 
-void SIPHashTable::FillBitmaskWithoutAList(Vector &key_vector, idx_t count, RAIInfo &rai_info) {
+void SIPHashTable::FillBitmaskWithoutAList(Vector &key_vector, idx_t count, RelAdjIndexInfo &rai_info) {
 	VectorData key_data;
 	key_vector.Orrify(count, key_data);
 	auto *keys = (int64_t *)key_data.data;
@@ -624,21 +591,22 @@ unique_ptr<SIPScanStructure> SIPHashTable::Probe(DataChunk &keys) {
 	// now initialize the pointers of the scan structure based on the hashes
 	ApplyBitmask(hashes, *current_sel, ss->count, ss->pointers);
 	// create the selection vector linking to only non-empty entries
-	idx_t count = 0;
+	idx_t count_ = 0;
 	auto pointers = FlatVector::GetData<data_ptr_t>(ss->pointers);
 	for (idx_t i = 0; i < ss->count; i++) {
 		auto idx = current_sel->get_index(i);
 		auto chain_pointer = (data_ptr_t *)(pointers[idx]);
 		pointers[idx] = *chain_pointer;
 		if (pointers[idx]) {
-			ss->sel_vector.set_index(count++, idx);
+			ss->sel_vector.set_index(count_++, idx);
 		}
 	}
-	ss->count = count;
+	ss->count = count_;
 	return ss;
 }
 
-SIPScanStructure::SIPScanStructure(SIPHashTable &ht) : sel_vector(STANDARD_VECTOR_SIZE), ht(ht), finished(false) {
+SIPScanStructure::SIPScanStructure(SIPHashTable &ht)
+    : count(0), sel_vector(STANDARD_VECTOR_SIZE), ht(ht), finished(false) {
 	pointers.Initialize(TypeId::POINTER);
 }
 
@@ -836,7 +804,7 @@ void SIPScanStructure::AdvancePointers() {
 }
 
 template <class T>
-static void SIPTemplatedGatherResult(Vector &result, uintptr_t *pointers, const SelectionVector &result_vector,
+static void SIPTemplatedGatherResult(Vector &result, const uintptr_t *pointers, const SelectionVector &result_vector,
                                      const SelectionVector &sel_vector, idx_t count, idx_t offset) {
 	auto rdata = FlatVector::GetData<T>(result);
 	auto &nullmask = FlatVector::Nullmask(result);
@@ -853,31 +821,31 @@ static void SIPTemplatedGatherResult(Vector &result, uintptr_t *pointers, const 
 }
 
 void SIPScanStructure::GatherResult(Vector &result, const SelectionVector &result_vector,
-                                    const SelectionVector &sel_vector, idx_t count, idx_t &offset) {
+                                    const SelectionVector &sel_vector_, idx_t count_, idx_t &offset) {
 	result.vector_type = VectorType::FLAT_VECTOR;
 	auto ptrs = FlatVector::GetData<uintptr_t>(pointers);
 	switch (result.type) {
 	case TypeId::BOOL:
 	case TypeId::INT8:
-		SIPTemplatedGatherResult<int8_t>(result, ptrs, result_vector, sel_vector, count, offset);
+		SIPTemplatedGatherResult<int8_t>(result, ptrs, result_vector, sel_vector_, count_, offset);
 		break;
 	case TypeId::INT16:
-		SIPTemplatedGatherResult<int16_t>(result, ptrs, result_vector, sel_vector, count, offset);
+		SIPTemplatedGatherResult<int16_t>(result, ptrs, result_vector, sel_vector_, count_, offset);
 		break;
 	case TypeId::INT32:
-		SIPTemplatedGatherResult<int32_t>(result, ptrs, result_vector, sel_vector, count, offset);
+		SIPTemplatedGatherResult<int32_t>(result, ptrs, result_vector, sel_vector_, count_, offset);
 		break;
 	case TypeId::INT64:
-		SIPTemplatedGatherResult<int64_t>(result, ptrs, result_vector, sel_vector, count, offset);
+		SIPTemplatedGatherResult<int64_t>(result, ptrs, result_vector, sel_vector_, count_, offset);
 		break;
 	case TypeId::FLOAT:
-		SIPTemplatedGatherResult<float>(result, ptrs, result_vector, sel_vector, count, offset);
+		SIPTemplatedGatherResult<float>(result, ptrs, result_vector, sel_vector_, count_, offset);
 		break;
 	case TypeId::DOUBLE:
-		SIPTemplatedGatherResult<double>(result, ptrs, result_vector, sel_vector, count, offset);
+		SIPTemplatedGatherResult<double>(result, ptrs, result_vector, sel_vector_, count_, offset);
 		break;
 	case TypeId::VARCHAR:
-		SIPTemplatedGatherResult<string_t>(result, ptrs, result_vector, sel_vector, count, offset);
+		SIPTemplatedGatherResult<string_t>(result, ptrs, result_vector, sel_vector_, count_, offset);
 		break;
 	default:
 		throw NotImplementedException("Unimplemented type for SIPScanStructure::GatherResult");
@@ -885,8 +853,8 @@ void SIPScanStructure::GatherResult(Vector &result, const SelectionVector &resul
 	offset += GetTypeIdSize(result.type);
 }
 
-void SIPScanStructure::GatherResult(Vector &result, const SelectionVector &sel_vector, idx_t count, idx_t &offset) {
-	GatherResult(result, FlatVector::IncrementalSelectionVector, sel_vector, count, offset);
+void SIPScanStructure::GatherResult(Vector &result, const SelectionVector &sel_vector_, idx_t count_, idx_t &offset) {
+	GatherResult(result, FlatVector::IncrementalSelectionVector, sel_vector_, count_, offset);
 }
 
 void SIPScanStructure::NextInnerJoin(DataChunk &keys, DataChunk &left, DataChunk &result) {
@@ -1027,7 +995,7 @@ void SIPScanStructure::NextMarkJoin(DataChunk &keys, DataChunk &input, DataChunk
 	assert(ht.count > 0);
 
 	ScanKeyMatches(keys);
-	if (ht.correlated_mark_join_info.correlated_types.size() == 0) {
+	if (ht.correlated_mark_join_info.correlated_types.empty()) {
 		ConstructMarkJoinResult(keys, input, result);
 	} else {
 		auto &info = ht.correlated_mark_join_info;
@@ -1073,12 +1041,12 @@ void SIPScanStructure::NextMarkJoin(DataChunk &keys, DataChunk &input, DataChunk
 		}
 
 		auto count_star = FlatVector::GetData<int64_t>(info.result_chunk.data[0]);
-		auto count = FlatVector::GetData<int64_t>(info.result_chunk.data[1]);
+		auto counts = FlatVector::GetData<int64_t>(info.result_chunk.data[1]);
 		// set the entries to either true or false based on whether a match was found
 		for (idx_t i = 0; i < input.size(); i++) {
-			assert(count_star[i] >= count[i]);
-			bool_result[i] = found_match ? found_match[i] : false;
-			if (!bool_result[i] && count_star[i] > count[i]) {
+			assert(count_star[i] >= counts[i]);
+			bool_result[i] = found_match && found_match[i];
+			if (!bool_result[i] && count_star[i] > counts[i]) {
 				// RHS has NULL value and result is false: set to null
 				nullmask[i] = true;
 			}

@@ -73,9 +73,12 @@ class UniqueConstraint;
 //===--------------------------------------------------------------------===//
 class TableRef;
 
+class VertexRef;
+class EdgeRef;
 class BaseTableRef;
 class CrossProductRef;
 class JoinRef;
+class PathJoinRef;
 class SubqueryRef;
 class TableFunctionRef;
 class EmptyTableRef;

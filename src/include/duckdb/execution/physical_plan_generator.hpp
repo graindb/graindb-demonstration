@@ -21,7 +21,7 @@ class ClientContext;
 //! logical query plan
 class PhysicalPlanGenerator {
 public:
-	PhysicalPlanGenerator(ClientContext &context) : context(context) {
+	explicit PhysicalPlanGenerator(ClientContext &context) : context(context) {
 	}
 
 	unordered_set<CatalogEntry *> dependencies;
@@ -44,7 +44,8 @@ protected:
 	unique_ptr<PhysicalOperator> CreatePlan(LogicalCreate &op);
 	unique_ptr<PhysicalOperator> CreatePlan(LogicalCreateTable &op);
 	unique_ptr<PhysicalOperator> CreatePlan(LogicalCreateIndex &op);
-	unique_ptr<PhysicalOperator> CreatePlan(LogicalCreateRAI &op);
+	unique_ptr<PhysicalOperator> CreatePlan(LogicalCreateVertex &op);
+	unique_ptr<PhysicalOperator> CreatePlan(LogicalCreateEdge &op);
 	unique_ptr<PhysicalOperator> CreatePlan(LogicalCrossProduct &op);
 	unique_ptr<PhysicalOperator> CreatePlan(LogicalDelete &op);
 	unique_ptr<PhysicalOperator> CreatePlan(LogicalDelimGet &op);

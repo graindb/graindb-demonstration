@@ -57,7 +57,7 @@ public:
 	ColumnBinding PushdownColumnBinding(ColumnBinding &binding) override {
 		column_t referenced_rai = binding.column_index == COLUMN_IDENTIFIER_ROW_ID
 		                              ? COLUMN_IDENTIFIER_ROW_ID
-		                              : tableref.columns[binding.column_index].rai_oid;
+		                              : tableref.columns[binding.column_index].join_index_oid;
 		auto entry = find(column_ids.begin(), column_ids.end(), referenced_rai);
 		if (entry != column_ids.end()) {
 			auto column_idx = distance(column_ids.begin(), entry);

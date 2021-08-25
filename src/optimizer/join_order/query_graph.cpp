@@ -48,7 +48,7 @@ QueryEdge *QueryGraph::GetQueryEdge(JoinRelationSet *left) {
 	return info;
 }
 
-void QueryGraph::CreateEdge(JoinRelationSet *left, JoinRelationSet *right, FilterInfo *filter_info, bool has_equality) {
+void QueryGraph::CreateEdge(JoinRelationSet *left, JoinRelationSet *right, FilterInfo *filter_info) {
 	assert(left && right && left->count > 0 && right->count > 0);
 	// find the EdgeInfo corresponding to the left set
 	auto info = GetQueryEdge(left);
@@ -122,6 +122,6 @@ NeighborInfo *QueryGraph::GetConnection(JoinRelationSet *node, JoinRelationSet *
 	return connection;
 }
 
-void QueryGraph::Print() {
+void QueryGraph::Print() const {
 	Printer::Print(ToString());
 }

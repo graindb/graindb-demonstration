@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "duckdb/parser/parsed_data/parse_info.hpp"
 #include "duckdb/common/enums/catalog_type.hpp"
+#include "duckdb/parser/parsed_data/parse_info.hpp"
 
 namespace duckdb {
 
@@ -23,11 +23,10 @@ enum class OnCreateConflict : uint8_t {
 };
 
 struct CreateInfo : public ParseInfo {
-	CreateInfo(CatalogType type, string schema = DEFAULT_SCHEMA)
-	    : type(type), schema(schema), on_conflict(OnCreateConflict::ERROR), temporary(false) {
+	explicit CreateInfo(CatalogType type, string schema = DEFAULT_SCHEMA)
+	    : type(type), schema(move(schema)), on_conflict(OnCreateConflict::ERROR), temporary(false) {
 	}
-	virtual ~CreateInfo() {
-	}
+	~CreateInfo() override = default;
 
 	//! The to-be-created catalog type
 	CatalogType type;

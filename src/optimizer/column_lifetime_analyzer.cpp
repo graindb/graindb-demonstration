@@ -94,17 +94,17 @@ void ColumnLifetimeAnalyzer::VisitOperator(LogicalOperator &op) {
 		ExtractUnusedColumnBindings(op.children[1]->GetColumnBindings(), unused_bindings);
 
 		// now recurse into the filter and its children
-//		StandardVisitOperator(op);
+		//		StandardVisitOperator(op);
 		LogicalOperatorVisitor::VisitOperatorChildren(op);
 
 		// then generate the projection map
 		GenerateProjectionMap(op.children[1]->GetColumnBindings(), unused_bindings, comp_join.right_projection_map);
-//		if (comp_join.op_mark == OpMark::MERGED_RJ) {
-//			column_binding_set_t unused_merged_bindings;
-//			ExtractUnusedColumnBindings(op.children[2]->GetColumnBindings(), unused_merged_bindings);
-//			GenerateProjectionMap(op.children[2]->GetColumnBindings(), unused_merged_bindings,
-//			                      comp_join.merge_projection_map);
-//		}
+		//		if (comp_join.op_hint == OpHint::MERGED_RJ) {
+		//			column_binding_set_t unused_merged_bindings;
+		//			ExtractUnusedColumnBindings(op.children[2]->GetColumnBindings(), unused_merged_bindings);
+		//			GenerateProjectionMap(op.children[2]->GetColumnBindings(), unused_merged_bindings,
+		//			                      comp_join.merge_projection_map);
+		//		}
 		return;
 	}
 	case LogicalOperatorType::UNION:

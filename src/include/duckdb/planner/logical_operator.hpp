@@ -20,34 +20,32 @@
 namespace duckdb {
 
 // nested loop join, hash join, adjacency join, default join, scan, lookup
-enum class OpMark : int8_t {
+enum class OpHint : int8_t {
 	NO_OP = 0,
 	NLJ = 1,
-	HASH_JOIN = 2,
-	SIP_JOIN = 3,
+	HJ = 2, // Hash Join
+	SJ = 3, // SIP Join
 	JOIN = 4,
-	MERGED_SIP_JOIN = 5,
+	MSJ = 5, // Merge SIP Join
 	SCAN = 6,
-	UNION = 7,
-	ADAPTIVE_SIP_JOIN = 8,
-	ADAPTIVE_MERGE_SIP_JOIN = 9
+	ADAPTIVE_SJ = 7,
+	ADAPTIVE_MSJ = 8,
 };
 
 //! LogicalOperator is the base class of the logical operators present in the
 //! logical query tree
 class LogicalOperator {
 public:
-	LogicalOperator(LogicalOperatorType type) : type(type), op_mark(OpMark::NO_OP) {
+	explicit LogicalOperator(LogicalOperatorType type) : type(type), op_hint(OpHint::NO_OP) {
 	}
 	LogicalOperator(LogicalOperatorType type, vector<unique_ptr<Expression>> expressions)
-	    : type(type), op_mark(OpMark::NO_OP), expressions(move(expressions)) {
+	    : type(type), op_hint(OpHint::NO_OP), expressions(move(expressions)) {
 	}
-	virtual ~LogicalOperator() {
-	}
+	virtual ~LogicalOperator() = default;
 
 	//! The type of the logical operator
 	LogicalOperatorType type;
-	OpMark op_mark;
+	OpHint op_hint;
 	//! The set of children of the operator
 	vector<unique_ptr<LogicalOperator>> children;
 	//! The set of expressions contained within the operator, if any
@@ -60,8 +58,8 @@ public:
 		return {};
 	}
 	static vector<ColumnBinding> GenerateColumnBindings(idx_t table_idx, idx_t column_count);
-	static vector<TypeId> MapTypes(vector<TypeId> types, vector<idx_t> projection_map);
-	static vector<ColumnBinding> MapBindings(vector<ColumnBinding> types, vector<idx_t> projection_map);
+	static vector<TypeId> MapTypes(vector<TypeId> types, const vector<idx_t> &projection_map);
+	static vector<ColumnBinding> MapBindings(vector<ColumnBinding> types, const vector<idx_t> &projection_map);
 
 	//! Resolve the types of the logical operator and its children
 	void ResolveOperatorTypes();
@@ -69,7 +67,7 @@ public:
 	virtual string ParamsToString() const;
 	virtual string ToString(idx_t depth = 0) const;
 	string ToJSON() const;
-	void Print();
+	void Print() const;
 
 	void AddChild(unique_ptr<LogicalOperator> child) {
 		children.push_back(move(child));
@@ -77,6 +75,10 @@ public:
 
 	virtual ColumnBinding PushdownColumnBinding(ColumnBinding &binding) {
 		return children[0]->PushdownColumnBinding(binding);
+	}
+
+	virtual unique_ptr<LogicalOperator> Copy() {
+		throw NotImplementedException("Copy for this logical operator is not implemented yet.");
 	}
 
 	virtual idx_t EstimateCardinality() {

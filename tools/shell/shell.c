@@ -74,11 +74,12 @@
 #define _LARGEFILE_SOURCE 1
 #endif
 
+#include "sqlite3.h"
+
+#include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <assert.h>
-#include "sqlite3.h"
 typedef sqlite3_int64 i64;
 typedef sqlite3_uint64 u64;
 typedef unsigned char u8;
@@ -95,8 +96,8 @@ typedef unsigned char u8;
 #endif
 #endif
 #if (!defined(_WIN32) && !defined(WIN32)) || defined(__MINGW32__)
-#include <unistd.h>
 #include <dirent.h>
+#include <unistd.h>
 #if defined(__MINGW32__)
 #define DIRENT dirent
 #ifndef S_ISLNK
@@ -104,12 +105,12 @@ typedef unsigned char u8;
 #endif
 #endif
 #endif
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #if HAVE_READLINE
-#include <readline/readline.h>
 #include <readline/history.h>
+#include <readline/readline.h>
 #endif
 
 #if HAVE_EDITLINE
@@ -143,8 +144,8 @@ typedef unsigned char u8;
 #endif
 
 #if defined(_WIN32) || defined(WIN32)
-#include <io.h>
 #include <fcntl.h>
+#include <io.h>
 #define isatty(h) _isatty(h)
 #ifndef access
 #define access(f, m) _access((f), (m))
@@ -235,8 +236,8 @@ static sqlite3_int64 timeOfDay(void) {
 }
 
 #if !defined(_WIN32) && !defined(WIN32) && !defined(__minux)
-#include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/time.h>
 
 /* VxWorks does not support getrusage() as far as we can determine */
 #if defined(_WRS_KERNEL) || defined(__RTP__)
@@ -412,7 +413,7 @@ static char *Argv0;
 ** Prompt strings. Initialized in main. Settable with
 **   .prompt main continue
 */
-static char mainPrompt[20];     /* First line prompt. default: "sqlite> "*/
+static char mainPrompt[20];     /* First line prompt. default: "graindb> "*/
 static char continuePrompt[20]; /* Continuation prompt. default: "   ...> " */
 
 /*
@@ -1017,13 +1018,13 @@ static void shellAddSchemaName(sqlite3_context *pCtx, int nVal, sqlite3_value **
 ** We need several things from the ANSI and MSVCRT headers.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <errno.h>
 #include <io.h>
 #include <limits.h>
-#include <sys/types.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 /*
 ** We may need several defines that should have been in "sys/stat.h".
@@ -1363,8 +1364,8 @@ INT closedir(LPDIR dirp) {
 */
 SQLITE_EXTENSION_INIT1
 #include <assert.h>
-#include <string.h>
 #include <stdarg.h>
+#include <string.h>
 /* typedef sqlite3_uint64 u64; */
 
 /******************************************************************************
@@ -2096,22 +2097,22 @@ int sqlite3_shathree_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routin
 **   relative to directory $dir.
 */
 SQLITE_EXTENSION_INIT1
+#include <assert.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
-
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#include <sys/types.h>
 #if !defined(_WIN32) && !defined(WIN32)
-#include <unistd.h>
 #include <dirent.h>
-#include <utime.h>
 #include <sys/time.h>
+#include <unistd.h>
+#include <utime.h>
 #else
 #include "windows.h"
-#include <io.h>
+
 #include <direct.h>
+#include <io.h>
 /* #  include "test_windirent.h" */
 #define dirent DIRENT
 #ifndef chmod
@@ -2123,8 +2124,8 @@ SQLITE_EXTENSION_INIT1
 #define mkdir(path, mode) _mkdir(path)
 #define lstat(path, buf) stat(path, buf)
 #endif
-#include <time.h>
 #include <errno.h>
+#include <time.h>
 
 #define FSDIR_SCHEMA "(name,mode,mtime,data,path HIDDEN,dir HIDDEN)"
 
@@ -2955,8 +2956,8 @@ int sqlite3_fileio_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines
 */
 SQLITE_EXTENSION_INIT1
 #include <assert.h>
-#include <string.h>
 #include <ctype.h>
+#include <string.h>
 
 #ifndef SQLITE_OMIT_VIRTUALTABLE
 
@@ -3027,9 +3028,9 @@ static int completionConnect(sqlite3 *db, void *pAux, int argc, const char *cons
 
 /* Column numbers */
 #define COMPLETION_COLUMN_CANDIDATE 0 /* Suggested completion of the input */
-#define COMPLETION_COLUMN_PREFIX 1    /* Prefix of the word to be completed */
+#define COMPLETION_COLUMN_PREFIX 1 /* Prefix of the word to be completed */
 #define COMPLETION_COLUMN_WHOLELINE 2 /* Entire line seen so far */
-#define COMPLETION_COLUMN_PHASE 3     /* ePhase - used for debugging only */
+#define COMPLETION_COLUMN_PHASE 3 /* ePhase - used for debugging only */
 
 	rc = sqlite3_declare_vtab(db, "CREATE TABLE x("
 	                              "  candidate TEXT,"
@@ -3488,8 +3489,8 @@ int sqlite3_completion_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_rout
 ** a pass-through into the default underlying VFS.
 **/
 SQLITE_EXTENSION_INIT1
-#include <string.h>
 #include <assert.h>
+#include <string.h>
 
 /* The append mark at the end of the database is:
 **
@@ -3991,10 +3992,9 @@ int sqlite3_appendvfs_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routi
 **    *  Only the "inflate/deflate" (zlib) compression method is supported
 */
 SQLITE_EXTENSION_INIT1
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
-
 #include <zlib.h>
 
 #ifndef SQLITE_OMIT_VIRTUALTABLE
@@ -6393,8 +6393,8 @@ void sqlite3_expert_destroy(sqlite3expert *);
 *************************************************************************
 */
 #include <assert.h>
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
 #ifndef SQLITE_OMIT_VIRTUALTABLE
 
@@ -8349,22 +8349,22 @@ struct ShellState {
 
 /* Allowed values for ShellState.openMode
  */
-#define SHELL_OPEN_UNSPEC 0    /* No open-mode specified */
-#define SHELL_OPEN_NORMAL 1    /* Normal database file */
+#define SHELL_OPEN_UNSPEC 0 /* No open-mode specified */
+#define SHELL_OPEN_NORMAL 1 /* Normal database file */
 #define SHELL_OPEN_APPENDVFS 2 /* Use appendvfs */
-#define SHELL_OPEN_ZIPFILE 3   /* Use the zipfile virtual table */
-#define SHELL_OPEN_READONLY 4  /* Open a normal database read-only */
+#define SHELL_OPEN_ZIPFILE 3 /* Use the zipfile virtual table */
+#define SHELL_OPEN_READONLY 4 /* Open a normal database read-only */
 
 /*
 ** These are the allowed shellFlgs values
 */
-#define SHFLG_Pagecache 0x00000001     /* The --pagecache option is used */
-#define SHFLG_Lookaside 0x00000002     /* Lookaside memory is used */
-#define SHFLG_Backslash 0x00000004     /* The --backslash option is used */
+#define SHFLG_Pagecache 0x00000001 /* The --pagecache option is used */
+#define SHFLG_Lookaside 0x00000002 /* Lookaside memory is used */
+#define SHFLG_Backslash 0x00000004 /* The --backslash option is used */
 #define SHFLG_PreserveRowid 0x00000008 /* .dump preserves rowid values */
-#define SHFLG_Newlines 0x00000010      /* .dump --newline flag */
-#define SHFLG_CountChanges 0x00000020  /* .changes setting */
-#define SHFLG_Echo 0x00000040          /* .echo or --echo setting */
+#define SHFLG_Newlines 0x00000010 /* .dump --newline flag */
+#define SHFLG_CountChanges 0x00000020 /* .changes setting */
+#define SHFLG_Echo 0x00000040 /* .echo or --echo setting */
 
 /*
 ** Macros for testing and setting shellFlgs
@@ -8376,17 +8376,17 @@ struct ShellState {
 /*
 ** These are the allowed modes.
 */
-#define MODE_Line 0    /* One column per line.  Blank line between records */
-#define MODE_Column 1  /* One record per line in neat columns */
-#define MODE_List 2    /* One record per line with a separator */
-#define MODE_Semi 3    /* Same as MODE_List but append ";" to each line */
-#define MODE_Html 4    /* Generate an XHTML table */
-#define MODE_Insert 5  /* Generate SQL "insert" statements */
-#define MODE_Quote 6   /* Quote values as for SQL */
-#define MODE_Tcl 7     /* Generate ANSI-C or TCL quoted elements */
-#define MODE_Csv 8     /* Quote strings, numbers are plain */
+#define MODE_Line 0 /* One column per line.  Blank line between records */
+#define MODE_Column 1 /* One record per line in neat columns */
+#define MODE_List 2 /* One record per line with a separator */
+#define MODE_Semi 3 /* Same as MODE_List but append ";" to each line */
+#define MODE_Html 4 /* Generate an XHTML table */
+#define MODE_Insert 5 /* Generate SQL "insert" statements */
+#define MODE_Quote 6 /* Quote values as for SQL */
+#define MODE_Tcl 7 /* Generate ANSI-C or TCL quoted elements */
+#define MODE_Csv 8 /* Quote strings, numbers are plain */
 #define MODE_Explain 9 /* Like MODE_Column, but do not truncate data */
-#define MODE_Ascii 10  /* Use ASCII unit and record separators (0x1F/0x1E) */
+#define MODE_Ascii 10 /* Use ASCII unit and record separators (0x1F/0x1E) */
 #define MODE_Pretty 11 /* Pretty-print schemas */
 
 static const char *modeDescr[] = {
@@ -14423,7 +14423,9 @@ static int do_meta_command(char *zLine, ShellState *p) {
 		utf8_printf(p->out, "%12.12s: %s\n", "echo", azBool[ShellHasFlag(p, SHFLG_Echo)]);
 		utf8_printf(p->out, "%12.12s: %s\n", "eqp", azBool[p->autoEQP & 3]);
 		utf8_printf(p->out, "%12.12s: %s\n", "explain",
-		            p->mode == MODE_Explain ? "on" : p->autoExplain ? "auto" : "off");
+		            p->mode == MODE_Explain ? "on"
+		            : p->autoExplain        ? "auto"
+		                                    : "off");
 		utf8_printf(p->out, "%12.12s: %s\n", "headers", azBool[p->showHeader != 0]);
 		utf8_printf(p->out, "%12.12s: %s\n", "mode", modeDescr[p->mode]);
 		utf8_printf(p->out, "%12.12s: ", "nullvalue");
@@ -15349,7 +15351,7 @@ static void main_init(ShellState *data) {
 	sqlite3_config(SQLITE_CONFIG_URI, 1);
 	sqlite3_config(SQLITE_CONFIG_LOG, shellLog, data);
 	sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
-	sqlite3_snprintf(sizeof(mainPrompt), mainPrompt, "sqlite> ");
+	sqlite3_snprintf(sizeof(mainPrompt), mainPrompt, "graindb> ");
 	sqlite3_snprintf(sizeof(continuePrompt), continuePrompt, "   ...> ");
 }
 

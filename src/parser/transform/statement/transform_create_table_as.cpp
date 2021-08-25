@@ -6,10 +6,10 @@
 using namespace duckdb;
 using namespace std;
 
-unique_ptr<CreateStatement> Transformer::TransformCreateTableAs(PGNode *node) {
-	auto stmt = reinterpret_cast<PGCreateTableAsStmt *>(node);
+unique_ptr<CreateStatement> Transformer::TransformCreateTableAs(duckdb_libpgquery::PGNode *node) {
+	auto stmt = reinterpret_cast<duckdb_libpgquery::PGCreateTableAsStmt *>(node);
 	assert(stmt);
-	if (stmt->relkind == PG_OBJECT_MATVIEW) {
+	if (stmt->relkind == duckdb_libpgquery::PG_OBJECT_MATVIEW) {
 		throw NotImplementedException("Materialized view not implemented");
 	}
 	if (stmt->is_select_into || stmt->into->colNames || stmt->into->options) {

@@ -5,8 +5,8 @@
 #include "duckdb/common/printer.hpp"
 #include "duckdb/common/serializer.hpp"
 #include "duckdb/common/types/null_value.hpp"
-#include "duckdb/common/vector_operations/vector_operations.hpp"
 #include "duckdb/common/unordered_map.hpp"
+#include "duckdb/common/vector_operations/vector_operations.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -15,14 +15,14 @@ DataChunk::DataChunk() : count(0) {
 }
 
 void DataChunk::InitializeEmpty(vector<TypeId> &types) {
-	assert(types.size() > 0);
-	for (idx_t i = 0; i < types.size(); i++) {
-		data.emplace_back(Vector(types[i], nullptr));
+	assert(!types.empty());
+	for (auto &type : types) {
+		data.emplace_back(Vector(type, nullptr));
 	}
 }
 
 void DataChunk::Initialize(vector<TypeId> &types) {
-	assert(types.size() > 0);
+	assert(!types.empty());
 	InitializeEmpty(types);
 	for (idx_t i = 0; i < types.size(); i++) {
 		data[i].Initialize();
@@ -132,7 +132,7 @@ void DataChunk::Serialize(Serializer &serializer) {
 
 void DataChunk::Deserialize(Deserializer &source) {
 	auto rows = source.Read<sel_t>();
-	idx_t column_count = source.Read<idx_t>();
+	auto column_count = source.Read<idx_t>();
 
 	vector<TypeId> types;
 	for (idx_t i = 0; i < column_count; i++) {
@@ -156,7 +156,8 @@ void DataChunk::Slice(const SelectionVector &sel_vector, idx_t count) {
 }
 
 void DataChunk::Slice(DataChunk &other, const SelectionVector &sel, idx_t count, idx_t col_offset) {
-	assert(other.column_count() <= col_offset + column_count());  // todo: ? other.column_count + col_offset <= column_count()
+	assert(other.column_count() <=
+	       col_offset + column_count()); // todo: ? other.column_count + col_offset <= column_count()
 	this->count = count;
 	sel_cache_t merge_cache;
 	for (idx_t c = 0; c < other.column_count(); c++) {
@@ -171,7 +172,8 @@ void DataChunk::Slice(DataChunk &other, const SelectionVector &sel, idx_t count,
 }
 
 void DataChunk::Slice(DataChunk &other, const SelectionVector &sel, idx_t count, idx_t col_offset, idx_t column_num) {
-	assert(other.column_count() <= col_offset + column_count());  // todo: ? other.column_count + col_offset <= column_count()
+	assert(other.column_count() <=
+	       col_offset + column_count()); // todo: ? other.column_count + col_offset <= column_count()
 	this->count = count;
 	sel_cache_t merge_cache;
 	for (idx_t c = 0; c < column_num; c++) {
@@ -185,8 +187,10 @@ void DataChunk::Slice(DataChunk &other, const SelectionVector &sel, idx_t count,
 	}
 }
 
-void DataChunk::Slice(DataChunk &other, const SelectionVector &sel, idx_t count, idx_t col_offset, vector<idx_t> &projection) {
-//	assert(other.column_count() <= col_offset + column_count());  // todo: ? other.column_count + col_offset <= column_count()
+void DataChunk::Slice(DataChunk &other, const SelectionVector &sel, idx_t count, idx_t col_offset,
+                      vector<idx_t> &projection) {
+	//	assert(other.column_count() <= col_offset + column_count());  // todo: ? other.column_count + col_offset <=
+	//column_count()
 	assert(col_offset + projection.size() <= column_count());
 	this->count = count;
 	sel_cache_t merge_cache;
@@ -228,6 +232,6 @@ void DataChunk::Verify() {
 #endif
 }
 
-void DataChunk::Print() {
+void DataChunk::Print() const {
 	Printer::Print(ToString());
 }

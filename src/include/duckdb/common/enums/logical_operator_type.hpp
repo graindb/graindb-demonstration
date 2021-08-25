@@ -67,8 +67,9 @@ enum class LogicalOperatorType : uint8_t {
 	// -----------------------------
 	ALTER,
 	CREATE_TABLE,
+	CREATE_VERTEX,
+	CREATE_EDGE,
 	CREATE_INDEX,
-	CREATE_RAI,
 	CREATE_SEQUENCE,
 	CREATE_VIEW,
 	CREATE_SCHEMA,

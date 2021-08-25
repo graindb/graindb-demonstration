@@ -21,7 +21,7 @@ using namespace chrono;
 
 DataTable::DataTable(StorageManager &storage, string schema, string table, vector<TypeId> types_,
                      unique_ptr<vector<unique_ptr<PersistentSegment>>[]> data)
-    : info(make_shared<DataTableInfo>(schema, table)), types(types_), storage(storage),
+    : info(make_shared<DataTableInfo>(move(schema), move(table))), types(move(types_)), storage(storage),
       persistent_manager(make_shared<VersionManager>(*info)), transient_manager(make_shared<VersionManager>(*info)),
       is_root(true) {
 	// set up the segment trees for the column segments
@@ -33,7 +33,7 @@ DataTable::DataTable(StorageManager &storage, string schema, string table, vecto
 	}
 
 	// initialize the table with the existing data from disk, if any
-	if (data && data[0].size() > 0) {
+	if (data && !data[0].empty()) {
 		// first append all the segments to the set of column segments
 		for (idx_t i = 0; i < types.size(); i++) {
 			columns[i]->Initialize(data[i]);
@@ -115,7 +115,7 @@ DataTable::DataTable(ClientContext &context, DataTable &parent, idx_t removed_co
 	parent.is_root = false;
 }
 
-DataTable::DataTable(ClientContext &context, DataTable &parent, idx_t changed_idx, SQLType target_type,
+DataTable::DataTable(ClientContext &context, DataTable &parent, idx_t changed_idx, const SQLType &target_type,
                      vector<column_t> bound_columns, Expression &cast_expr)
     : info(parent.info), types(parent.types), storage(parent.storage), persistent_manager(parent.persistent_manager),
       transient_manager(parent.transient_manager), columns(parent.columns), is_root(true) {
@@ -203,13 +203,13 @@ void DataTable::InitializeScan(TableScanState &state, vector<column_t> column_id
 	state.max_persistent_row = persistent_manager->max_row;
 	state.current_transient_row = 0;
 	state.max_transient_row = transient_manager->max_row;
-	if (table_filters && table_filters->size() > 0) {
+	if (table_filters && !table_filters->empty()) {
 		state.adaptive_filter = make_unique<AdaptiveFilter>(*table_filters);
 	}
 }
 
 void DataTable::InitializeScan(TableScanState &state, vector<column_t> column_ids,
-                               const shared_ptr<rows_vector> &rowids_, idx_t rows_count_,
+                               const shared_ptr<vector<row_t>> &rowids_, idx_t rows_count_,
                                unordered_map<idx_t, vector<TableFilter>> *table_filters) {
 	InitializeScan(state, move(column_ids), table_filters);
 	state.rowids = rowids_;
@@ -386,7 +386,7 @@ bool DataTable::CheckZonemap(TableScanState &state, unordered_map<idx_t, vector<
 }
 
 template <class T>
-void inline DataTable::LookupRows(shared_ptr<ColumnData> column, const shared_ptr<vector<row_t>> &rowids,
+void inline DataTable::LookupRows(const shared_ptr<ColumnData> &column, const shared_ptr<vector<row_t>> &rowids,
                                   Vector &result, idx_t offset, idx_t count, idx_t type_size) {
 	auto result_data = FlatVector::GetData(result);
 	idx_t s_size = column->data.nodes[0].node->count;
@@ -582,15 +582,15 @@ void DataTable::InitializeIndexScan(Transaction &transaction, TableIndexScanStat
 void DataTable::InitializeIndexScan(Transaction &transaction, TableIndexScanState &state, Index &index, Value value,
                                     ExpressionType expr_type, vector<column_t> column_ids) {
 	InitializeIndexScan(transaction, state, index, move(column_ids));
-	state.index_state = index.InitializeScanSinglePredicate(transaction, state.column_ids, value, expr_type);
+	state.index_state = index.InitializeScanSinglePredicate(transaction, state.column_ids, move(value), expr_type);
 }
 
 void DataTable::InitializeIndexScan(Transaction &transaction, TableIndexScanState &state, Index &index, Value low_value,
                                     ExpressionType low_type, Value high_value, ExpressionType high_type,
                                     vector<column_t> column_ids) {
 	InitializeIndexScan(transaction, state, index, move(column_ids));
-	state.index_state =
-	    index.InitializeScanTwoPredicates(transaction, state.column_ids, low_value, low_type, high_value, high_type);
+	state.index_state = index.InitializeScanTwoPredicates(transaction, state.column_ids, move(low_value), low_type,
+	                                                      move(high_value), high_type);
 }
 
 void DataTable::IndexScan(Transaction &transaction, DataChunk &result, TableIndexScanState &state) {
@@ -807,7 +807,7 @@ void DataTable::RevertAppend(TableAppendState &state) {
 //===--------------------------------------------------------------------===//
 bool DataTable::AppendToIndexes(TableAppendState &state, DataChunk &chunk, row_t row_start) {
 	assert(is_root);
-	if (info->indexes.size() == 0) {
+	if (info->indexes.empty()) {
 		return true;
 	}
 	// first generate the vector of row identifiers
@@ -835,7 +835,7 @@ bool DataTable::AppendToIndexes(TableAppendState &state, DataChunk &chunk, row_t
 
 void DataTable::RemoveFromIndexes(TableAppendState &state, DataChunk &chunk, row_t row_start) {
 	assert(is_root);
-	if (info->indexes.size() == 0) {
+	if (info->indexes.empty()) {
 		return;
 	}
 	// first generate the vector of row identifiers
@@ -871,8 +871,8 @@ void DataTable::RemoveFromIndexes(Vector &row_identifiers, idx_t count) {
 		columns[i]->Fetch(states[i], row_ids[0], result.data[i]);
 	}
 	result.Slice(sel, count);
-	for (idx_t i = 0; i < info->indexes.size(); i++) {
-		info->indexes[i]->Delete(result, row_identifiers);
+	for (auto &index : info->indexes) {
+		index->Delete(result, row_identifiers);
 	}
 }
 
@@ -920,8 +920,8 @@ static bool CreateMockChunk(TableCatalogEntry &table, vector<column_t> &column_i
                             unordered_set<column_t> &desired_column_ids, DataChunk &chunk, DataChunk &mock_chunk) {
 	idx_t found_columns = 0;
 	// check whether the desired columns are present in the UPDATE clause
-	for (column_t i = 0; i < column_ids.size(); i++) {
-		if (desired_column_ids.find(column_ids[i]) != desired_column_ids.end()) {
+	for (auto column_id : column_ids) {
+		if (desired_column_ids.find(column_id) != desired_column_ids.end()) {
 			found_columns++;
 		}
 	}
@@ -975,8 +975,8 @@ void DataTable::VerifyUpdateConstraints(TableCatalogEntry &table, DataChunk &chu
 	// update should not be called for indexed columns!
 	// instead update should have been rewritten to delete + update on higher layer
 #ifdef DEBUG
-	for (idx_t i = 0; i < info->indexes.size(); i++) {
-		assert(!info->indexes[i]->IndexIsUpdated(column_ids));
+	for (auto &index : info->indexes) {
+		assert(!index->IndexIsUpdated(column_ids));
 	}
 #endif
 }
@@ -1023,7 +1023,7 @@ void DataTable::InitializeCreateIndexScan(CreateIndexScanState &state, vector<co
 	state.locks.push_back(persistent_manager->lock.GetSharedLock());
 	state.locks.push_back(transient_manager->lock.GetSharedLock());
 
-	InitializeScan(state, column_ids);
+	InitializeScan(state, move(column_ids));
 }
 
 void DataTable::CreateIndexScan(CreateIndexScanState &state, DataChunk &result) {
@@ -1108,70 +1108,19 @@ void DataTable::AddIndex(unique_ptr<Index> index, vector<unique_ptr<Expression>>
 			throw ConstraintException("Cant create unique index, table contains duplicate data on indexed column(s)");
 		}
 	}
+	if (!index->FinalizeInsert()) {
+		throw InternalException("Finalizing index insert failed!");
+	}
 	info->indexes.push_back(move(index));
 }
 
-void DataTable::UpdateColumnCards(Transaction &transaction) {
-	DataChunk result;
-	result.Initialize(this->types);
-	vector<idx_t> columns_ids;
-	for (idx_t i = 0; i < this->types.size(); i++) {
-		columns_ids.push_back(i);
-	}
-	// initialize an cardinality scan
-	TableScanState state;
-	InitializeScan(transaction, state, columns_ids);
-	// now start incrementally building the column cardinality
-	idx_t result_count = 0;
-	unordered_map<idx_t, vector<TableFilter>> empty_table_filter;
-	for (idx_t i = 0; i < columns_ids.size(); i++) {
-		auto hyper_obj = make_unique<HyperLogLog>();
-		info->column_card_objs.push_back(move(hyper_obj));
-	}
-	do {
-		result.Reset();
-		// scan a new chunk from the table to index
-		this->Scan(transaction, result, state, empty_table_filter);
-		result_count = result.size();
-		if (result_count == 0)
-			break;
-		for (idx_t col = 0; col < columns_ids.size(); col++) {
-			for (idx_t row = 0; row < result_count; row++) {
-				auto result_tuple = result.GetValue(col, row).ToString();
-				auto pCUC_result_tuple = (unsigned char *)result_tuple.c_str();
-				this->info->column_card_objs[col]->Add(pCUC_result_tuple, result_tuple.length());
-			}
-		}
-	} while (result_count != 0);
-	// get final count
-	info->column_cards.clear();
-	info->column_cards.resize(columns_ids.size(), 0);
-	for (column_t i = 0; i < columns_ids.size(); i++) {
-		info->column_cards[i] = info->column_card_objs[i]->Count();
-	}
-}
-
-void DataTable::AddRAI(unique_ptr<RAI> rai) const {
-	info->rais.push_back(move(rai));
-}
-
-void DataTable::AppendRAIColumn(column_t oid) {
+void DataTable::AppendJoinIndexColumn(column_t oid) {
 	column_t columns_count = columns.size();
 	assert(columns_count == oid);
 	auto column = make_shared<ColumnData>(*storage.buffer_manager, *info);
 	column->type = TypeId::INT64;
 	column->column_idx = oid;
 	columns.push_back(move(column));
-}
-
-string DataTable::GetRAIsInfo() const {
-	//! example:: rai: order_rai(o_custkey: Customer.c_custkey, o_orderkey: Lineitem.l_orderkey)
-	//! param:&table, column_ids, referenced_tables, referenced_columns
-	if (info->rais.empty())
-		return "false";
-	string result = "rai: ";
-	for (auto &rai : info->rais) {
-		result += rai->ToString();
-	}
-	return result;
+	types.push_back(TypeId::INT64);
+	assert(types.size() == columns.size());
 }

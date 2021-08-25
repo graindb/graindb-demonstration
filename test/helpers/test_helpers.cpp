@@ -1,12 +1,12 @@
 // #define CATCH_CONFIG_RUNNER
-#include "catch.hpp"
+#include "test_helpers.hpp"
 
-#include "duckdb/execution/operator/persistent/buffered_csv_reader.hpp"
+#include "catch.hpp"
+#include "compare_result.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/value_operations/value_operations.hpp"
-#include "compare_result.hpp"
+#include "duckdb/execution/operator/persistent/buffered_csv_reader.hpp"
 #include "duckdb/main/query_result.hpp"
-#include "test_helpers.hpp"
 #include "duckdb/parser/parsed_data/copy_info.hpp"
 
 #include <cmath>
@@ -29,31 +29,31 @@ bool NO_FAIL(unique_ptr<QueryResult> result) {
 	return NO_FAIL(*result);
 }
 
-void TestDeleteDirectory(string path) {
+void TestDeleteDirectory(const string &path) {
 	FileSystem fs;
 	if (fs.DirectoryExists(path)) {
 		fs.RemoveDirectory(path);
 	}
 }
 
-void TestDeleteFile(string path) {
+void TestDeleteFile(const string &path) {
 	FileSystem fs;
 	if (fs.FileExists(path)) {
 		fs.RemoveFile(path);
 	}
 }
 
-void DeleteDatabase(string path) {
+void DeleteDatabase(const string &path) {
 	TestDeleteFile(path);
 	TestDeleteFile(path + ".wal");
 }
 
-void TestCreateDirectory(string path) {
+void TestCreateDirectory(const string &path) {
 	FileSystem fs;
 	fs.CreateDirectory(path);
 }
 
-string TestCreatePath(string suffix) {
+string TestCreatePath(const string &suffix) {
 	FileSystem fs;
 	if (!fs.DirectoryExists(TESTING_DIRECTORY_NAME)) {
 		fs.CreateDirectory(TESTING_DIRECTORY_NAME);
@@ -77,13 +77,13 @@ string GetCSVPath() {
 	return csv_path;
 }
 
-void WriteCSV(string path, const char *csv) {
+void WriteCSV(const string &path, const char *csv) {
 	ofstream csv_writer(path);
 	csv_writer << csv;
 	csv_writer.close();
 }
 
-void WriteBinary(string path, const uint8_t *data, uint64_t length) {
+void WriteBinary(const string &path, const uint8_t *data, uint64_t length) {
 	ofstream binary_writer(path, ios::binary);
 	binary_writer.write((const char *)data, length);
 	binary_writer.close();
@@ -99,12 +99,12 @@ bool CHECK_COLUMN(QueryResult &result_, size_t column_number, vector<duckdb::Val
 		fprintf(stderr, "Query failed with message: %s\n", result.error.c_str());
 		return false;
 	}
-	if (!(result.names.size() == result.types.size())) {
+	if (result.names.size() != result.types.size()) {
 		// column names do not match
 		result.Print();
 		return false;
 	}
-	if (values.size() == 0) {
+	if (values.empty()) {
 		if (result.collection.count != 0) {
 			result.Print();
 			return false;
@@ -245,7 +245,7 @@ bool compare_chunk(DataChunk &left, DataChunk &right) {
 
 //! Compares the result of a pipe-delimited CSV with the given DataChunk
 //! Returns true if they are equal, and stores an error_message otherwise
-bool compare_result(string csv, ChunkCollection &collection, vector<SQLType> sql_types, bool has_header,
+bool compare_result(const string &csv, ChunkCollection &collection, const vector<SQLType> &sql_types, bool has_header,
                     string &error_message) {
 	assert(collection.count == 0 || collection.types.size() == sql_types.size());
 

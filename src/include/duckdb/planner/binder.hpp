@@ -16,7 +16,8 @@
 #include "duckdb/planner/bound_tokens.hpp"
 #include "duckdb/planner/expression/bound_columnref_expression.hpp"
 #include "duckdb/planner/logical_operator.hpp"
-#include "duckdb/planner/parsed_data/bound_create_rai_info.hpp"
+#include "duckdb/planner/parsed_data/bound_create_edge_info.hpp"
+#include "duckdb/planner/tableref/bound_joinref.hpp"
 
 namespace duckdb {
 class BoundResultModifier;
@@ -28,8 +29,9 @@ class TableCatalogEntry;
 class ViewCatalogEntry;
 
 struct CreateInfo;
+struct BoundCreateVertexInfo;
 struct BoundCreateTableInfo;
-struct BoundCreateRAIInfo;
+struct BoundCreateEdgeInfo;
 
 struct CorrelatedColumnInfo {
 	ColumnBinding binding;
@@ -37,7 +39,7 @@ struct CorrelatedColumnInfo {
 	string name;
 	idx_t depth;
 
-	CorrelatedColumnInfo(BoundColumnRefExpression &expr)
+	explicit CorrelatedColumnInfo(BoundColumnRefExpression &expr)
 	    : binding(expr.binding), type(expr.return_type), name(expr.GetName()), depth(expr.depth) {
 	}
 
@@ -57,7 +59,7 @@ class Binder {
 	friend class RecursiveSubqueryPlanner;
 
 public:
-	Binder(ClientContext &context, Binder *parent = nullptr);
+	explicit Binder(ClientContext &context, Binder *parent = nullptr);
 
 	//! The client context
 	ClientContext &context;
@@ -80,7 +82,8 @@ public:
 	BoundStatement Bind(QueryNode &node);
 
 	unique_ptr<BoundCreateTableInfo> BindCreateTableInfo(unique_ptr<CreateInfo> info);
-	unique_ptr<BoundCreateRAIInfo> BindCreateRAIInfo(unique_ptr<CreateInfo> info);
+	unique_ptr<BoundCreateVertexInfo> BindCreateVertexInfo(unique_ptr<CreateInfo> info);
+	unique_ptr<BoundCreateEdgeInfo> BindCreateEdgeInfo(unique_ptr<CreateInfo> info);
 	SchemaCatalogEntry *BindSchema(CreateInfo &info);
 
 	unique_ptr<BoundTableRef> Bind(TableRef &ref);
@@ -104,7 +107,7 @@ public:
 
 	void MergeCorrelatedColumns(vector<CorrelatedColumnInfo> &other);
 	//! Add a correlated column to this binder (if it does not exist)
-	void AddCorrelatedColumn(CorrelatedColumnInfo info);
+	void AddCorrelatedColumn(const CorrelatedColumnInfo &info);
 
 private:
 	//! The parent binder (if any)
@@ -154,10 +157,13 @@ private:
 	unique_ptr<BoundTableRef> Bind(BaseTableRef &ref);
 	unique_ptr<BoundTableRef> Bind(CrossProductRef &ref);
 	unique_ptr<BoundTableRef> Bind(JoinRef &ref);
+	unique_ptr<BoundTableRef> Bind(PathJoinRef &ref);
 	unique_ptr<BoundTableRef> Bind(SubqueryRef &ref);
 	unique_ptr<BoundTableRef> Bind(TableFunctionRef &ref);
 	unique_ptr<BoundTableRef> Bind(EmptyTableRef &ref);
 	unique_ptr<BoundTableRef> Bind(ExpressionListRef &ref);
+	unique_ptr<BoundTableRef> Bind(VertexRef &ref);
+	unique_ptr<BoundTableRef> Bind(EdgeRef &ref);
 
 	unique_ptr<LogicalOperator> CreatePlan(BoundBaseTableRef &ref);
 	unique_ptr<LogicalOperator> CreatePlan(BoundCrossProductRef &ref);
@@ -167,12 +173,7 @@ private:
 	unique_ptr<LogicalOperator> CreatePlan(BoundEmptyTableRef &ref);
 	unique_ptr<LogicalOperator> CreatePlan(BoundExpressionListRef &ref);
 	unique_ptr<LogicalOperator> CreatePlan(BoundCTERef &ref);
-
-	unique_ptr<LogicalOperator> CreatePlan(BoundCreateRAIInfo &info);
-
-	unique_ptr<LogicalOperator> BindTable(TableCatalogEntry &table, BaseTableRef &ref);
-	unique_ptr<LogicalOperator> BindView(ViewCatalogEntry &view, BaseTableRef &ref);
-	unique_ptr<LogicalOperator> BindTableOrView(BaseTableRef &ref);
+	unique_ptr<LogicalOperator> CreatePlan(BoundVertexRef &ref);
 
 	BoundStatement BindCopyTo(CopyStatement &stmt);
 	BoundStatement BindCopyFrom(CopyStatement &stmt);
@@ -181,7 +182,7 @@ private:
 	void BindModifierTypes(BoundQueryNode &result, const vector<SQLType> &sql_types, idx_t projection_index);
 	unique_ptr<BoundResultModifier> BindLimit(LimitModifier &limit_mod);
 	unique_ptr<Expression> BindFilter(unique_ptr<ParsedExpression> condition);
-	unique_ptr<Expression> BindOrderExpression(OrderBinder &order_binder, unique_ptr<ParsedExpression> expr);
+	static unique_ptr<Expression> BindOrderExpression(OrderBinder &order_binder, unique_ptr<ParsedExpression> expr);
 
 	unique_ptr<LogicalOperator> PlanFilter(unique_ptr<Expression> condition, unique_ptr<LogicalOperator> root);
 

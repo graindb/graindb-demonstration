@@ -16,7 +16,7 @@ namespace duckdb {
 //! Bound equivalent of SetOperationNode
 class BoundRecursiveCTENode : public BoundQueryNode {
 public:
-	BoundRecursiveCTENode() : BoundQueryNode(QueryNodeType::RECURSIVE_CTE_NODE) {
+	BoundRecursiveCTENode() : BoundQueryNode(QueryNodeType::RECURSIVE_CTE_NODE), union_all(true), setop_index(0) {
 	}
 
 	//! Keep track of the CTE name this node represents

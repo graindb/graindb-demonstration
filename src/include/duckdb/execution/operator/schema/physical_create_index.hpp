@@ -23,7 +23,7 @@ public:
 	PhysicalCreateIndex(LogicalOperator &op, TableCatalogEntry &table, vector<column_t> column_ids,
 	                    vector<unique_ptr<Expression>> expressions, unique_ptr<CreateIndexInfo> info,
 	                    vector<unique_ptr<Expression>> unbinded_expressions)
-	    : PhysicalOperator(PhysicalOperatorType::CREATE_INDEX, op.types), table(table), column_ids(column_ids),
+	    : PhysicalOperator(PhysicalOperatorType::CREATE_INDEX, op.types), table(table), column_ids(move(column_ids)),
 	      expressions(move(expressions)), info(std::move(info)), unbound_expressions(move(unbinded_expressions)) {
 	}
 

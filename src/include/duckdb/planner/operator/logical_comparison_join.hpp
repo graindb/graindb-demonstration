@@ -20,11 +20,12 @@ namespace duckdb {
 //! LogicalComparisonJoin represents a join that involves comparisons between the LHS and RHS
 class LogicalComparisonJoin : public LogicalJoin {
 public:
-	LogicalComparisonJoin(JoinType type, LogicalOperatorType logical_type = LogicalOperatorType::COMPARISON_JOIN);
+	explicit LogicalComparisonJoin(JoinType type,
+	                               LogicalOperatorType logical_type = LogicalOperatorType::COMPARISON_JOIN);
 
 	//! The conditions of the join
 	vector<JoinCondition> conditions;
-	bool enable_lookup_join;
+	bool enable_lookup_join; // set by SIPJoinRewriter and SIPJoinMerger
 
 public:
 	string ParamsToString() const override;

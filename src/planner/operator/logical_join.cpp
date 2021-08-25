@@ -18,7 +18,7 @@ vector<ColumnBinding> LogicalJoin::GetColumnBindings() {
 	}
 	if (join_type == JoinType::MARK) {
 		// for MARK join we project the left hand side plus the MARK column
-		left_bindings.push_back(ColumnBinding(mark_index, 0));
+		left_bindings.emplace_back(mark_index, 0);
 		return left_bindings;
 	}
 	// for other join types we project both the LHS and the RHS
@@ -36,14 +36,14 @@ ColumnBinding LogicalJoin::PushdownColumnBinding(ColumnBinding &binding) {
 	if (left_tables.find(binding.table_index) != left_tables.end()) {
 		auto child_binding = children[0]->PushdownColumnBinding(binding);
 		if (child_binding.column_index != INVALID_INDEX) {
-			if (left_projection_map.size() != 0) {
+			if (!left_projection_map.empty()) {
 				left_projection_map.push_back(child_binding.column_index);
 			}
 			return child_binding;
 		}
 	}
 	if (join_type == JoinType::SEMI || join_type == JoinType::ANTI || join_type == JoinType::MARK) {
-		return ColumnBinding(binding.table_index, INVALID_INDEX);
+		return {binding.table_index, INVALID_INDEX};
 	}
 	auto right_bindings = children[1]->GetColumnBindings();
 	for (auto &rb : right_bindings) {
@@ -52,14 +52,14 @@ ColumnBinding LogicalJoin::PushdownColumnBinding(ColumnBinding &binding) {
 	if (right_tables.find(binding.table_index) != right_tables.end()) {
 		auto child_binding = children[1]->PushdownColumnBinding(binding);
 		if (child_binding.column_index != INVALID_INDEX) {
-			if (right_projection_map.size() != 0) {
+			if (!right_projection_map.empty()) {
 				right_projection_map.push_back(child_binding.column_index);
 			}
 			return child_binding;
 		}
 	}
 
-	return ColumnBinding(binding.table_index, INVALID_INDEX);
+	return {binding.table_index, INVALID_INDEX};
 }
 
 void LogicalJoin::ResolveTypes() {

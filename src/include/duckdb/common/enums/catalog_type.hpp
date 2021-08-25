@@ -27,7 +27,8 @@ enum class CatalogType : uint8_t {
 	PREPARED_STATEMENT = 8,
 	SEQUENCE = 9,
 	COLLATION = 10,
-	RAI = 11,
+	EDGE = 11,
+	VERTEX = 12,
 
 	UPDATED_ENTRY = 50,
 	DELETED_ENTRY = 51,

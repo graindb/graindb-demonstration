@@ -59,13 +59,13 @@ string PhysicalOperatorToString(PhysicalOperatorType type) {
 	case PhysicalOperatorType::NESTED_LOOP_JOIN:
 		return "NESTED_LOOP_JOIN";
 	case PhysicalOperatorType::HASH_JOIN:
-		return "HASH_JOIN";
+		return "HJ";
 	case PhysicalOperatorType::ADJACENCY_JOIN:
 		return "ADJACENCY_JOIN";
 	case PhysicalOperatorType::RAI_JOIN:
 		return "RAI_JOIN";
 	case PhysicalOperatorType::SIP_JOIN:
-		return "SIP_JOIN";
+		return "SJ";
 	case PhysicalOperatorType::MERGE_RAI_JOIN:
 		return "M_RAI_JOIN";
 	case PhysicalOperatorType::MERGE_SIP_JOIN:
@@ -94,8 +94,10 @@ string PhysicalOperatorToString(PhysicalOperatorType type) {
 		return "CREATE";
 	case PhysicalOperatorType::CREATE_INDEX:
 		return "CREATE_INDEX";
-	case PhysicalOperatorType::CREATE_RAI:
-		return "CREATE_RAI";
+	case PhysicalOperatorType::CREATE_VERTEX:
+		return "CREATE_VERTEX";
+	case PhysicalOperatorType::CREATE_EDGE:
+		return "CREATE_EDGE";
 	case PhysicalOperatorType::EXPLAIN:
 		return "EXPLAIN";
 	case PhysicalOperatorType::EXECUTE:

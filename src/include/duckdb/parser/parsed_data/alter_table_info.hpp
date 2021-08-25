@@ -8,18 +8,19 @@
 
 #pragma once
 
-#include "duckdb/parser/parsed_data/parse_info.hpp"
 #include "duckdb/parser/column_definition.hpp"
+#include "duckdb/parser/parsed_data/parse_info.hpp"
+
+#include <utility>
 
 namespace duckdb {
 
 enum class AlterType : uint8_t { INVALID = 0, ALTER_TABLE = 1 };
 
 struct AlterInfo : public ParseInfo {
-	AlterInfo(AlterType type) : type(type) {
+	explicit AlterInfo(AlterType type) : type(type) {
 	}
-	virtual ~AlterInfo() {
-	}
+	~AlterInfo() override = default;
 
 	AlterType type;
 
@@ -34,15 +35,15 @@ enum class AlterTableType : uint8_t {
 	ADD_COLUMN = 3,
 	REMOVE_COLUMN = 4,
 	ALTER_COLUMN_TYPE = 5,
-	SET_DEFAULT = 6
+	SET_DEFAULT = 6,
+	ADD_JOIN_INDEX_COLUMN = 7
 };
 
 struct AlterTableInfo : public AlterInfo {
 	AlterTableInfo(AlterTableType type, string schema, string table)
-	    : AlterInfo(AlterType::ALTER_TABLE), alter_table_type(type), schema(schema), table(table) {
+	    : AlterInfo(AlterType::ALTER_TABLE), alter_table_type(type), schema(move(schema)), table(move(table)) {
 	}
-	virtual ~AlterTableInfo() override {
-	}
+	~AlterTableInfo() override = default;
 
 	AlterTableType alter_table_type;
 	//! Schema name to alter to
@@ -51,7 +52,7 @@ struct AlterTableInfo : public AlterInfo {
 	string table;
 
 public:
-	virtual void Serialize(Serializer &serializer) override;
+	void Serialize(Serializer &serializer) override;
 	static unique_ptr<AlterInfo> Deserialize(Deserializer &source);
 };
 
@@ -60,10 +61,10 @@ public:
 //===--------------------------------------------------------------------===//
 struct RenameColumnInfo : public AlterTableInfo {
 	RenameColumnInfo(string schema, string table, string name, string new_name)
-	    : AlterTableInfo(AlterTableType::RENAME_COLUMN, schema, table), name(name), new_name(new_name) {
+	    : AlterTableInfo(AlterTableType::RENAME_COLUMN, move(schema), move(table)), name(move(name)),
+	      new_name(move(new_name)) {
 	}
-	~RenameColumnInfo() override {
-	}
+	~RenameColumnInfo() override = default;
 
 	//! Column old name
 	string name;
@@ -80,10 +81,9 @@ public:
 //===--------------------------------------------------------------------===//
 struct RenameTableInfo : public AlterTableInfo {
 	RenameTableInfo(string schema, string table, string new_name)
-	    : AlterTableInfo(AlterTableType::RENAME_TABLE, schema, table), new_table_name(new_name) {
+	    : AlterTableInfo(AlterTableType::RENAME_TABLE, move(schema), move(table)), new_table_name(move(new_name)) {
 	}
-	~RenameTableInfo() override {
-	}
+	~RenameTableInfo() override = default;
 
 	//! Table new name
 	string new_table_name;
@@ -98,10 +98,27 @@ public:
 //===--------------------------------------------------------------------===//
 struct AddColumnInfo : public AlterTableInfo {
 	AddColumnInfo(string schema, string table, ColumnDefinition new_column)
-	    : AlterTableInfo(AlterTableType::ADD_COLUMN, schema, table), new_column(move(new_column)) {
+	    : AlterTableInfo(AlterTableType::ADD_COLUMN, move(schema), move(table)), new_column(move(new_column)) {
 	}
-	~AddColumnInfo() override {
+	~AddColumnInfo() override = default;
+
+	//! New column
+	ColumnDefinition new_column;
+
+public:
+	void Serialize(Serializer &serializer) override;
+	static unique_ptr<AlterInfo> Deserialize(Deserializer &source, string schema, string table);
+};
+
+//===--------------------------------------------------------------------===//
+// AddJoinIndexColumnInfo
+//===--------------------------------------------------------------------===//
+struct AddJoinIndexColumnInfo : public AlterTableInfo {
+	AddJoinIndexColumnInfo(string schema, string table, ColumnDefinition new_column)
+	    : AlterTableInfo(AlterTableType::ADD_JOIN_INDEX_COLUMN, move(schema), move(table)),
+	      new_column(move(new_column)) {
 	}
+	~AddJoinIndexColumnInfo() override = default;
 
 	//! New column
 	ColumnDefinition new_column;
@@ -116,11 +133,10 @@ public:
 //===--------------------------------------------------------------------===//
 struct RemoveColumnInfo : public AlterTableInfo {
 	RemoveColumnInfo(string schema, string table, string removed_column, bool if_exists)
-	    : AlterTableInfo(AlterTableType::REMOVE_COLUMN, schema, table), removed_column(move(removed_column)),
-	      if_exists(if_exists) {
+	    : AlterTableInfo(AlterTableType::REMOVE_COLUMN, move(schema), move(table)),
+	      removed_column(move(removed_column)), if_exists(if_exists) {
 	}
-	~RemoveColumnInfo() override {
-	}
+	~RemoveColumnInfo() override = default;
 
 	//! The column to remove
 	string removed_column;
@@ -138,11 +154,10 @@ public:
 struct ChangeColumnTypeInfo : public AlterTableInfo {
 	ChangeColumnTypeInfo(string schema, string table, string column_name, SQLType target_type,
 	                     unique_ptr<ParsedExpression> expression)
-	    : AlterTableInfo(AlterTableType::ALTER_COLUMN_TYPE, schema, table), column_name(move(column_name)),
+	    : AlterTableInfo(AlterTableType::ALTER_COLUMN_TYPE, move(schema), move(table)), column_name(move(column_name)),
 	      target_type(move(target_type)), expression(move(expression)) {
 	}
-	~ChangeColumnTypeInfo() override {
-	}
+	~ChangeColumnTypeInfo() override = default;
 
 	//! The column name to alter
 	string column_name;
@@ -161,11 +176,10 @@ public:
 //===--------------------------------------------------------------------===//
 struct SetDefaultInfo : public AlterTableInfo {
 	SetDefaultInfo(string schema, string table, string column_name, unique_ptr<ParsedExpression> new_default)
-	    : AlterTableInfo(AlterTableType::SET_DEFAULT, schema, table), column_name(move(column_name)),
+	    : AlterTableInfo(AlterTableType::SET_DEFAULT, move(schema), move(table)), column_name(move(column_name)),
 	      expression(move(new_default)) {
 	}
-	~SetDefaultInfo() override {
-	}
+	~SetDefaultInfo() override = default;
 
 	//! The column name to alter
 	string column_name;

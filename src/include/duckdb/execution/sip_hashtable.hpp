@@ -50,7 +50,7 @@ public:
 		SIPHashTable &ht;
 		bool finished;
 
-		SIPScanStructure(SIPHashTable &ht);
+		explicit SIPScanStructure(SIPHashTable &ht);
 		//! Get the next batch of data from the scan structure
 		void Next(DataChunk &keys, DataChunk &left, DataChunk &result);
 
@@ -99,10 +99,10 @@ private:
 	};
 
 	struct BlockAppendEntry {
-		BlockAppendEntry(data_ptr_t baseptr_, idx_t count_) : baseptr(baseptr_), count(count_) {
+		BlockAppendEntry(data_ptr_t base_ptr_, idx_t count_) : base_ptr(base_ptr_), count(count_) {
 		}
 
-		data_ptr_t baseptr;
+		data_ptr_t base_ptr;
 		idx_t count;
 	};
 
@@ -117,26 +117,26 @@ public:
 	~SIPHashTable();
 
 	//! Initialize
-	void Initialize();
+	// void Initialize();
 	//! Add the given data to the HT
 	void Build(DataChunk &keys, DataChunk &input);
 	//! Finalize the build of the HT, constructing the actual hash table and making the HT ready for probing. Finalize
 	//! must be called before any call to Probe, and after Finalize is called Build should no longer be ever called.
 	void Finalize();
 	// WARNING: Deprecated!!! same as Finalize(), except we generate semi-join filters as by-product
-	void FinalizeWithFilter(RAIInfo &rai_info);
+	//	void FinalizeWithFilter(RAIInfo &rai_info);
 	//! Probe the HT with the given input chunk, resulting in the given result
 	unique_ptr<SIPScanStructure> Probe(DataChunk &keys);
 
-	void GenerateBitmaskFilter(RAIInfo &rai_info, bool use_alist);
+	void GenerateBitmaskFilter(RelAdjIndexInfo &rai_info, bool use_alists);
 	//! Copying not allowed
 	SIPHashTable(const SIPHashTable &) = delete;
 
-	idx_t size() {
+	idx_t size() const {
 		return count;
 	}
 
-	//! The stringheap of the SIPHashTable
+	//! The string heap of the SIPHashTable
 	StringHeap string_heap;
 	//! BufferManager
 	BufferManager &buffer_manager;
@@ -168,7 +168,7 @@ public:
 	uint64_t bitmask;
 	//! The amount of entries stored per block
 	idx_t block_capacity;
-	//! Initliazation flag
+	//! Initialization flag
 	bool initialized;
 	//! The hash map of the HT, created after finalization
 	unique_ptr<BufferHandle> hash_map;
@@ -192,8 +192,8 @@ public:
 private:
 	//! Apply a bitmask to the hashes
 	void ApplyBitmask(Vector &hashes, idx_t count) const;
-	void ApplyBitmask(Vector &hashes, const SelectionVector &sel, idx_t count, Vector &pointers);
-	void ApplyKeymask(Vector &keys, const SelectionVector &sel, idx_t count, Vector &pointers);
+	void ApplyBitmask(Vector &hashes, const SelectionVector &sel, idx_t count, Vector &pointers) const;
+	//	void ApplyKeymask(Vector &keys, const SelectionVector &sel, idx_t count, Vector &pointers);
 	//! Insert the given set of locations into the HT with the given set of
 	//! hashes. Caller should hold lock in parallel HT.
 	void InsertHashes(Vector &hashes, idx_t count, data_ptr_t key_locations[]);
@@ -204,8 +204,8 @@ private:
 	                         data_ptr_t key_locations[]);
 	void SerializeVector(Vector &v, idx_t vcount, const SelectionVector &sel, idx_t count, data_ptr_t key_locations[]);
 
-	static void FillBitmaskWithAList(Vector &key_vector, idx_t count, RAIInfo &rai_info);
-	static void FillBitmaskWithoutAList(Vector &key_vector, idx_t count, RAIInfo &rai_info);
+	static void FillBitmaskWithAList(Vector &key_vector, idx_t count, RelAdjIndexInfo &rai_info);
+	static void FillBitmaskWithoutAList(Vector &key_vector, idx_t count, RelAdjIndexInfo &rai_info);
 	//! The amount of entries stored in the HT currently
 	idx_t count;
 	//! The blocks holding the main data of the hash table

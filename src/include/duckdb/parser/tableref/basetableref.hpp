@@ -17,6 +17,10 @@ public:
 	BaseTableRef() : TableRef(TableReferenceType::BASE_TABLE), schema_name(INVALID_SCHEMA) {
 	}
 
+	BaseTableRef(string schema_name, string table_name)
+	    : TableRef(TableReferenceType::BASE_TABLE), schema_name(move(schema_name)), table_name(move(table_name)) {
+	}
+
 	//! Schema name
 	string schema_name;
 	//! Table name

@@ -28,7 +28,7 @@ unique_ptr<PhysicalOperator> PhysicalPlanGenerator::CreatePlan(LogicalGet &op) {
 			}
 		}
 		dependencies.insert(op.table);
-		if (op.op_mark == OpMark::SCAN) {
+		if (op.op_hint == OpHint::SCAN) {
 			return make_unique<PhysicalLookup>(op, *op.table, op.table_index, *op.table->storage, op.column_ids,
 			                                   move(op.expressions), move(table_filter_umap));
 		}

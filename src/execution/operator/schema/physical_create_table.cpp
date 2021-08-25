@@ -13,7 +13,7 @@ void PhysicalCreateTable::GetChunkInternal(ClientContext &context, DataChunk &ch
 	int64_t inserted_count = 0;
 
 	auto table = (TableCatalogEntry *)schema->CreateTable(context, info.get());
-	if (table && children.size() > 0) {
+	if (table && !children.empty()) {
 		while (true) {
 			children[0]->GetChunk(context, state->child_chunk, state->child_state.get());
 			if (state->child_chunk.size() == 0) {

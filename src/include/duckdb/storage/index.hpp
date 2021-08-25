@@ -8,13 +8,13 @@
 
 #pragma once
 
-#include "duckdb/common/unordered_set.hpp"
 #include "duckdb/common/enums/index_type.hpp"
 #include "duckdb/common/types/data_chunk.hpp"
+#include "duckdb/common/unordered_set.hpp"
+#include "duckdb/execution/expression_executor.hpp"
 #include "duckdb/parser/parsed_expression.hpp"
 #include "duckdb/planner/expression.hpp"
 #include "duckdb/storage/table/scan_state.hpp"
-#include "duckdb/execution/expression_executor.hpp"
 
 namespace duckdb {
 
@@ -26,8 +26,7 @@ struct IndexLock;
 //! The index is an abstract base class that serves as the basis for indexes
 class Index {
 public:
-	Index(IndexType type, vector<column_t> column_ids,
-	      vector<unique_ptr<Expression>> unbound_expressions);
+	Index(IndexType type, const vector<column_t> &column_ids, vector<unique_ptr<Expression>> unbound_expressions);
 	virtual ~Index() = default;
 
 	//! Lock used for updating the index
@@ -73,6 +72,9 @@ public:
 
 	//! Insert data into the index. Does not lock the index.
 	virtual bool Insert(IndexLock &lock, DataChunk &input, Vector &row_identifiers) = 0;
+	virtual bool FinalizeInsert() {
+		return true;
+	}
 
 	//! Returns true if the index is affected by updates on the specified column ids, and false otherwise
 	bool IndexIsUpdated(vector<column_t> &column_ids);

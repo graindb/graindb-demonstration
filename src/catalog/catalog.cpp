@@ -3,10 +3,8 @@
 #include "duckdb/catalog/catalog_entry/list.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/main/client_context.hpp"
-#include "duckdb/parser/expression/function_expression.hpp"
+#include "duckdb/main/database.hpp"
 #include "duckdb/parser/parsed_data/alter_table_info.hpp"
-#include "duckdb/parser/parsed_data/create_index_info.hpp"
-#include "duckdb/parser/parsed_data/create_aggregate_function_info.hpp"
 #include "duckdb/parser/parsed_data/create_collation_info.hpp"
 #include "duckdb/parser/parsed_data/create_scalar_function_info.hpp"
 #include "duckdb/parser/parsed_data/create_schema_info.hpp"
@@ -15,8 +13,8 @@
 #include "duckdb/parser/parsed_data/create_view_info.hpp"
 #include "duckdb/parser/parsed_data/drop_info.hpp"
 #include "duckdb/planner/parsed_data/bound_create_table_info.hpp"
+#include "duckdb/planner/parsed_data/bound_create_vertex_info.hpp"
 #include "duckdb/storage/storage_manager.hpp"
-#include "duckdb/main/database.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -31,6 +29,16 @@ Catalog &Catalog::GetCatalog(ClientContext &context) {
 CatalogEntry *Catalog::CreateTable(ClientContext &context, BoundCreateTableInfo *info) {
 	auto schema = GetSchema(context, info->base->schema);
 	return schema->CreateTable(context, info);
+}
+
+CatalogEntry *Catalog::CreateVertex(ClientContext &context, BoundCreateVertexInfo *info) {
+	auto schema = GetSchema(context, info->base->schema);
+	return schema->CreateVertex(context, info);
+}
+
+CatalogEntry *Catalog::CreateEdge(ClientContext &context, BoundCreateEdgeInfo *info) {
+	auto schema = GetSchema(context, info->base->schema);
+	return schema->CreateEdge(context, info);
 }
 
 CatalogEntry *Catalog::CreateView(ClientContext &context, CreateViewInfo *info) {

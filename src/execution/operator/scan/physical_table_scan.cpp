@@ -4,19 +4,31 @@
 #include "duckdb/planner/expression/bound_conjunction_expression.hpp"
 #include "duckdb/transaction/transaction.hpp"
 
-#include <iostream>
-#include <utility>
-
 using namespace duckdb;
 using namespace std;
 
+//! Count true values in the bitmask_vector
+static idx_t bitmask_count(bitmask_vector &vector) {
+	idx_t result = 0;
+	for (auto i = 0u; i < vector.size(); i++) {
+		result += i;
+	}
+	return result;
+}
+
 class PhysicalTableScanOperatorState : public PhysicalOperatorState {
 public:
-	PhysicalTableScanOperatorState(Expression &expr)
+	explicit PhysicalTableScanOperatorState(Expression &expr)
 	    : PhysicalOperatorState(nullptr), initialized(false), executor(expr) {
 	}
 	PhysicalTableScanOperatorState() : PhysicalOperatorState(nullptr), initialized(false) {
 	}
+
+	void Reset() override {
+		finished = false;
+		initialized = false;
+	}
+
 	//! Whether or not the scan has been initialized
 	bool initialized;
 	//! The current position in the scan
@@ -59,7 +71,7 @@ bool PhysicalTableScan::PushdownZoneFilter(idx_t table_index_, const shared_ptr<
 			auto zone_filter_index = 0;
 			for (idx_t i = 0; i < result_zone_bitmask.size(); i++) {
 				auto zone_count = result_zone_bitmask[i] * STANDARD_VECTOR_SIZE;
-				for (idx_t j = 0; j < zone_count; j++) {
+				for (auto j = 0; j < zone_count; j++) {
 					auto current_index = i * STANDARD_VECTOR_SIZE + j;
 					result_row_bitmask[current_index] =
 					    result_row_bitmask[current_index] & input_row_bitmask[current_index];
@@ -75,7 +87,7 @@ bool PhysicalTableScan::PushdownZoneFilter(idx_t table_index_, const shared_ptr<
 	return false;
 }
 
-bool PhysicalTableScan::PushdownRowsFilter(idx_t table_index_, const shared_ptr<rows_vector> &rows_filter_,
+bool PhysicalTableScan::PushdownRowsFilter(idx_t table_index_, const shared_ptr<vector<row_t>> &rows_filter_,
                                            idx_t count) {
 	if (this->table_index == table_index_) {
 		if (this->rows_count <= 0 || (row_t)count < this->rows_count) {
@@ -105,7 +117,7 @@ void PhysicalTableScan::PerformSeqScan(DataChunk &chunk, PhysicalOperatorState *
 	table.Scan(transaction, chunk, state->scan_offset, table_filters);
 }
 
-template <class T> static void Lookup(ColumnData &column, row_t *row_ids, Vector &result, idx_t count) {
+template <class T> static void Lookup(ColumnData &column, const row_t *row_ids, Vector &result, idx_t count) {
 	auto result_data = FlatVector::GetData(result);
 	auto type_size = sizeof(T);
 	idx_t s_size = column.data.nodes[0].node->count;
@@ -149,49 +161,49 @@ void PhysicalTableScan::PerformLookup(DataChunk &chunk, PhysicalOperatorState *s
 			auto column = table.GetColumn(col);
 			switch (column->type) {
 			case TypeId::INT8: {
-				Lookup<int8_t>(*column.get(), row_ids, chunk.data[col_idx], fetch_count);
+				Lookup<int8_t>(*column, row_ids, chunk.data[col_idx], fetch_count);
 				break;
 			}
 			case TypeId::UINT8: {
-				Lookup<uint8_t>(*column.get(), row_ids, chunk.data[col_idx], fetch_count);
+				Lookup<uint8_t>(*column, row_ids, chunk.data[col_idx], fetch_count);
 				break;
 			}
 			case TypeId::INT16: {
-				Lookup<int16_t>(*column.get(), row_ids, chunk.data[col_idx], fetch_count);
+				Lookup<int16_t>(*column, row_ids, chunk.data[col_idx], fetch_count);
 				break;
 			}
 			case TypeId::HASH:
 			case TypeId::UINT16: {
-				Lookup<uint16_t>(*column.get(), row_ids, chunk.data[col_idx], fetch_count);
+				Lookup<uint16_t>(*column, row_ids, chunk.data[col_idx], fetch_count);
 				break;
 			}
 			case TypeId::INT32: {
-				Lookup<int32_t>(*column.get(), row_ids, chunk.data[col_idx], fetch_count);
+				Lookup<int32_t>(*column, row_ids, chunk.data[col_idx], fetch_count);
 				break;
 			}
 			case TypeId::UINT32: {
-				Lookup<uint32_t>(*column.get(), row_ids, chunk.data[col_idx], fetch_count);
+				Lookup<uint32_t>(*column, row_ids, chunk.data[col_idx], fetch_count);
 				break;
 			}
 			case TypeId::TIMESTAMP:
 			case TypeId::INT64: {
-				Lookup<int64_t>(*column.get(), row_ids, chunk.data[col_idx], fetch_count);
+				Lookup<int64_t>(*column, row_ids, chunk.data[col_idx], fetch_count);
 				break;
 			}
 			case TypeId::UINT64: {
-				Lookup<uint64_t>(*column.get(), row_ids, chunk.data[col_idx], fetch_count);
+				Lookup<uint64_t>(*column, row_ids, chunk.data[col_idx], fetch_count);
 				break;
 			}
 			case TypeId::FLOAT: {
-				Lookup<float_t>(*column.get(), row_ids, chunk.data[col_idx], fetch_count);
+				Lookup<float_t>(*column, row_ids, chunk.data[col_idx], fetch_count);
 				break;
 			}
 			case TypeId::DOUBLE: {
-				Lookup<double_t>(*column.get(), row_ids, chunk.data[col_idx], fetch_count);
+				Lookup<double_t>(*column, row_ids, chunk.data[col_idx], fetch_count);
 				break;
 			}
 			case TypeId::POINTER: {
-				Lookup<uintptr_t>(*column.get(), row_ids, chunk.data[col_idx], fetch_count);
+				Lookup<uintptr_t>(*column, row_ids, chunk.data[col_idx], fetch_count);
 				break;
 			}
 			default: {
@@ -203,7 +215,7 @@ void PhysicalTableScan::PerformLookup(DataChunk &chunk, PhysicalOperatorState *s
 	// filter
 	SelectionVector filter_sel(fetch_count);
 	auto result_count = fetch_count;
-	if (table_filters.size() > 0) {
+	if (!table_filters.empty()) {
 		result_count = state->executor.SelectExpression(chunk, filter_sel);
 	}
 #if ENABLE_PROFILING
@@ -239,7 +251,7 @@ void PhysicalTableScan::GetChunkInternal(ClientContext &context, DataChunk &chun
 }
 
 string PhysicalTableScan::ExtraRenderInformation() const {
-	string result = "";
+	string result;
 	if (expression) {
 		result += tableref.name + " " + expression->ToString();
 	} else {
@@ -260,9 +272,10 @@ string PhysicalTableScan::ExtraRenderInformation() const {
 		if (rows_count >= 0) {
 			result += "\nROWS_FILTER(" + to_string(rows_count) + "/" + to_string(table.info->cardinality) + ")";
 		} else if (row_bitmask) {
-			result += "\nROWS_BITMASK(" + to_string(row_bitmask->count()) + "/" + to_string(row_bitmask->size()) + ")";
 			result +=
-			    "\nZONE_BITMASK(" + to_string(zone_bitmask->count()) + "/" + to_string(zone_bitmask->size()) + ")";
+			    "\nROWS_BITMASK(" + to_string(bitmask_count(*row_bitmask)) + "/" + to_string(row_bitmask->size()) + ")";
+			result += "\nZONE_BITMASK(" + to_string(bitmask_count(*zone_bitmask)) + "/" +
+			          to_string(zone_bitmask->size()) + ")";
 		}
 	} else {
 		result += "\nLOOKUP(" + to_string(lookup_size) + "/" + to_string(table.info->cardinality) + ")";
@@ -272,6 +285,8 @@ string PhysicalTableScan::ExtraRenderInformation() const {
 }
 
 unique_ptr<PhysicalOperatorState> PhysicalTableScan::GetOperatorState() {
+	row_bitmask.reset();
+	zone_bitmask.reset();
 	if (expression) {
 		return make_unique<PhysicalTableScanOperatorState>(*expression);
 	} else {

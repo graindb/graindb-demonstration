@@ -4,10 +4,9 @@
 #include "duckdb/parser/query_node/select_node.hpp"
 #include "duckdb/parser/query_node/set_operation_node.hpp"
 #include "duckdb/planner/binder.hpp"
-#include "duckdb/planner/expression/bound_columnref_expression.hpp"
-#include "duckdb/planner/query_node/bound_set_operation_node.hpp"
-#include "duckdb/planner/query_node/bound_select_node.hpp"
 #include "duckdb/planner/expression_binder/order_binder.hpp"
+#include "duckdb/planner/query_node/bound_select_node.hpp"
+#include "duckdb/planner/query_node/bound_set_operation_node.hpp"
 
 using namespace std;
 
@@ -76,7 +75,7 @@ unique_ptr<BoundQueryNode> Binder::BindNode(SetOperationNode &statement) {
 	result->right_binder = make_unique<Binder>(context, this);
 	result->right = result->right_binder->BindNode(*statement.right);
 
-	if (statement.modifiers.size() > 0) {
+	if (!statement.modifiers.empty()) {
 		// handle the ORDER BY/DISTINCT clauses
 
 		// we recursively visit the children of this node to extract aliases and expressions that can be referenced in

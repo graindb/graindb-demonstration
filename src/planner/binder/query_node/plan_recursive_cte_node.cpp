@@ -1,5 +1,5 @@
-#include "duckdb/planner/expression/bound_cast_expression.hpp"
 #include "duckdb/planner/binder.hpp"
+#include "duckdb/planner/expression/bound_cast_expression.hpp"
 #include "duckdb/planner/operator/logical_projection.hpp"
 #include "duckdb/planner/operator/logical_recursive_cte.hpp"
 #include "duckdb/planner/operator/logical_set_operation.hpp"
@@ -24,7 +24,7 @@ unique_ptr<LogicalOperator> Binder::CreatePlan(BoundRecursiveCTENode &node) {
 	left_node = CastLogicalOperatorToTypes(node.left->types, node.types, move(left_node));
 	right_node = CastLogicalOperatorToTypes(node.right->types, node.types, move(right_node));
 
-	if (node.right_binder->bind_context.cte_references[node.ctename] == 0) {
+	if (node.right_binder->bind_context.cte_references[node.ctename] == nullptr) {
 		auto root = make_unique<LogicalSetOperation>(node.setop_index, node.types.size(), move(left_node),
 		                                             move(right_node), LogicalOperatorType::UNION);
 		return VisitQueryNode(node, move(root));

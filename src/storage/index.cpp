@@ -1,15 +1,15 @@
 #include "duckdb/storage/index.hpp"
+
 #include "duckdb/execution/expression_executor.hpp"
-#include "duckdb/planner/expression_iterator.hpp"
 #include "duckdb/planner/expression/bound_columnref_expression.hpp"
 #include "duckdb/planner/expression/bound_reference_expression.hpp"
+#include "duckdb/planner/expression_iterator.hpp"
 #include "duckdb/storage/table/append_state.hpp"
 
 using namespace duckdb;
 using namespace std;
 
-Index::Index(IndexType type, vector<column_t> column_ids,
-             vector<unique_ptr<Expression>> unbound_expressions)
+Index::Index(IndexType type, const vector<column_t> &column_ids, vector<unique_ptr<Expression>> unbound_expressions)
     : type(type), column_ids(column_ids), unbound_expressions(move(unbound_expressions)) {
 	for (auto &expr : this->unbound_expressions) {
 		types.push_back(expr->return_type);

@@ -10,8 +10,11 @@
 
 #include "duckdb/parser/parsed_expression.hpp"
 #include "duckdb/parser/query_node.hpp"
+#include "duckdb/parser/query_node/recursive_cte_node.hpp"
 #include "duckdb/parser/sql_statement.hpp"
 #include "duckdb/parser/tableref.hpp"
+
+#include <unordered_map>
 
 namespace duckdb {
 
@@ -39,6 +42,8 @@ public:
 	unique_ptr<ParsedExpression> having;
 	//! Aggregate handling during binding
 	AggregateHandling aggregate_handling;
+
+	unordered_map<string, unique_ptr<RecursiveCTENode>> cte_map;
 
 	const vector<unique_ptr<ParsedExpression>> &GetSelectList() const override {
 		return select_list;

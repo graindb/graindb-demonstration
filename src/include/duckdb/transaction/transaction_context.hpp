@@ -19,7 +19,7 @@ class TransactionManager;
 //! current transaction
 class TransactionContext {
 public:
-	TransactionContext(TransactionManager &transaction_manager)
+	explicit TransactionContext(TransactionManager &transaction_manager)
 	    : transaction_manager(transaction_manager), auto_commit(true), is_invalidated(false),
 	      current_transaction(nullptr) {
 	}
@@ -31,7 +31,7 @@ public:
 	}
 
 	bool HasActiveTransaction() {
-		return !!current_transaction;
+		return current_transaction != nullptr;
 	}
 
 	void RecordQuery(string query);
@@ -42,7 +42,7 @@ public:
 	void SetAutoCommit(bool value) {
 		auto_commit = value;
 	}
-	bool IsAutoCommit() {
+	bool IsAutoCommit() const {
 		return auto_commit;
 	}
 
@@ -57,6 +57,7 @@ private:
 
 	Transaction *current_transaction;
 
+public:
 	TransactionContext(const TransactionContext &) = delete;
 };
 

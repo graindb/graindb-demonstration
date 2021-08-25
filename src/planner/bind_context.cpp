@@ -1,11 +1,10 @@
 #include "duckdb/planner/bind_context.hpp"
 
+#include "duckdb/common/string_util.hpp"
 #include "duckdb/parser/expression/columnref_expression.hpp"
 #include "duckdb/parser/tableref/subqueryref.hpp"
-#include "duckdb/planner/expression/bound_columnref_expression.hpp"
 #include "duckdb/planner/bound_query_node.hpp"
-
-#include "duckdb/common/string_util.hpp"
+#include "duckdb/planner/expression/bound_columnref_expression.hpp"
 
 #include <algorithm>
 
@@ -73,11 +72,11 @@ BindResult BindContext::BindColumn(ColumnRefExpression &colref, idx_t depth) {
 }
 
 void BindContext::GenerateAllColumnExpressions(vector<unique_ptr<ParsedExpression>> &new_select_list,
-                                               string relation_name) {
-	if (bindings_list.size() == 0) {
+                                               const string &relation_name) {
+	if (bindings_list.empty()) {
 		throw BinderException("SELECT * expression without FROM clause!");
 	}
-	if (relation_name == "") { // SELECT * case
+	if (relation_name.empty()) { // SELECT * case
 		// we have to bind the tables and subqueries in order of table_index
 		for (auto &entry : bindings_list) {
 			auto binding = entry.second;
@@ -98,12 +97,20 @@ void BindContext::AddBinding(const string &alias, unique_ptr<Binding> binding) {
 	if (bindings.find(alias) != bindings.end()) {
 		throw BinderException("Duplicate alias \"%s\" in query!", alias.c_str());
 	}
-	bindings_list.push_back(make_pair(alias, binding.get()));
+	bindings_list.emplace_back(alias, binding.get());
 	bindings[alias] = move(binding);
 }
 
 void BindContext::AddBaseTable(idx_t index, const string &alias, TableCatalogEntry &table, LogicalGet &get) {
 	AddBinding(alias, make_unique<TableBinding>(alias, table, get, index));
+}
+
+void BindContext::AddVertex(idx_t index, const string &alias, VertexCatalogEntry &vertex, LogicalGet &get) {
+	if (vertex_bindings.find(alias) != vertex_bindings.end()) {
+		throw BinderException("Duplicate vertex alias \"%s\" in query!", alias.c_str());
+	}
+	vertex_bindings[alias] = make_unique<VertexBinding>(alias, vertex, index);
+	AddBinding(alias, make_unique<TableBinding>(alias, *vertex.base_table, get, index));
 }
 
 void BindContext::AddSubquery(idx_t index, const string &alias, SubqueryRef &ref, BoundQueryNode &subquery) {

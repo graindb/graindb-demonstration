@@ -1,8 +1,8 @@
 #include "duckdb/planner/binder.hpp"
-#include "duckdb/planner/operator/list.hpp"
-#include "duckdb/planner/query_node/bound_select_node.hpp"
-#include "duckdb/planner/operator/logical_expression_get.hpp"
 #include "duckdb/planner/expression/bound_columnref_expression.hpp"
+#include "duckdb/planner/operator/list.hpp"
+#include "duckdb/planner/operator/logical_expression_get.hpp"
+#include "duckdb/planner/query_node/bound_select_node.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -24,11 +24,10 @@ unique_ptr<LogicalOperator> Binder::CreatePlan(BoundSelectNode &statement) {
 		root = PlanFilter(move(statement.where_clause), move(root));
 	}
 
-	if (statement.aggregates.size() > 0 || statement.groups.size() > 0) {
-		if (statement.groups.size() > 0) {
+	if (!statement.aggregates.empty() || !statement.groups.empty()) {
+		if (!statement.groups.empty()) {
 			// visit the groups
-			for (idx_t i = 0; i < statement.groups.size(); i++) {
-				auto &group = statement.groups[i];
+			for (auto &group : statement.groups) {
 				PlanSubqueries(&group, &root);
 			}
 		}
@@ -53,26 +52,26 @@ unique_ptr<LogicalOperator> Binder::CreatePlan(BoundSelectNode &statement) {
 		root = move(having);
 	}
 
-	if (statement.windows.size() > 0) {
+	if (!statement.windows.empty()) {
 		auto win = make_unique<LogicalWindow>(statement.window_index);
 		win->expressions = move(statement.windows);
 		// visit the window expressions
 		for (auto &expr : win->expressions) {
 			PlanSubqueries(&expr, &root);
 		}
-		assert(win->expressions.size() > 0);
+		assert(!win->expressions.empty());
 		win->AddChild(move(root));
 		root = move(win);
 	}
 
-	if (statement.unnests.size() > 0) {
+	if (!statement.unnests.empty()) {
 		auto unnest = make_unique<LogicalUnnest>(statement.unnest_index);
 		unnest->expressions = move(statement.unnests);
 		// visit the window expressions
 		for (auto &expr : unnest->expressions) {
 			PlanSubqueries(&expr, &root);
 		}
-		assert(unnest->expressions.size() > 0);
+		assert(!unnest->expressions.empty());
 		unnest->AddChild(move(root));
 		root = move(unnest);
 	}

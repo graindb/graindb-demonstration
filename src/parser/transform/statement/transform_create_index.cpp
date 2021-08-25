@@ -20,8 +20,8 @@ static IndexType StringToIndexType(const string &str) {
 	return IndexType::INVALID;
 }
 
-unique_ptr<CreateStatement> Transformer::TransformCreateIndex(PGNode *node) {
-	auto stmt = reinterpret_cast<PGIndexStmt *>(node);
+unique_ptr<CreateStatement> Transformer::TransformCreateIndex(duckdb_libpgquery::PGNode *node) {
+	auto stmt = reinterpret_cast<duckdb_libpgquery::PGIndexStmt *>(node);
 	assert(stmt);
 	auto result = make_unique<CreateStatement>();
 	auto info = make_unique<CreateIndexInfo>();
@@ -30,7 +30,7 @@ unique_ptr<CreateStatement> Transformer::TransformCreateIndex(PGNode *node) {
 	info->on_conflict = stmt->if_not_exists ? OnCreateConflict::IGNORE : OnCreateConflict::ERROR;
 
 	for (auto cell = stmt->indexParams->head; cell != nullptr; cell = cell->next) {
-		auto index_element = (PGIndexElem *)cell->data.ptr_value;
+		auto index_element = (duckdb_libpgquery::PGIndexElem *)cell->data.ptr_value;
 		if (index_element->collation) {
 			throw NotImplementedException("Index with collation not supported yet!");
 		}

@@ -7,7 +7,12 @@ using namespace std;
 
 class PhysicalExpressionScanState : public PhysicalOperatorState {
 public:
-	PhysicalExpressionScanState(PhysicalOperator *child) : PhysicalOperatorState(child), expression_index(0) {
+	explicit PhysicalExpressionScanState(PhysicalOperator *child) : PhysicalOperatorState(child), expression_index(0) {
+	}
+
+	void Reset() override {
+		PhysicalOperatorState::Reset();
+		expression_index = 0;
 	}
 
 	//! The current position in the scan

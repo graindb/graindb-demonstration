@@ -4,8 +4,8 @@
 using namespace duckdb;
 using namespace std;
 
-unique_ptr<VacuumStatement> Transformer::TransformVacuum(PGNode *node) {
-	auto stmt = reinterpret_cast<PGVacuumStmt *>(node);
+unique_ptr<VacuumStatement> Transformer::TransformVacuum(duckdb_libpgquery::PGNode *node) {
+	auto stmt = reinterpret_cast<duckdb_libpgquery::PGVacuumStmt *>(node);
 	assert(stmt);
 	auto result = make_unique<VacuumStatement>();
 	auto info = make_unique<VacuumInfo>();

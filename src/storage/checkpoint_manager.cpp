@@ -1,31 +1,23 @@
 #include "duckdb/storage/checkpoint_manager.hpp"
-#include "duckdb/storage/block_manager.hpp"
-#include "duckdb/storage/meta_block_reader.hpp"
 
-#include "duckdb/common/serializer.hpp"
-#include "duckdb/common/vector_operations/vector_operations.hpp"
-#include "duckdb/common/types/null_value.hpp"
-
-#include "duckdb/catalog/catalog.hpp"
+#include "duckdb/catalog/catalog_entry/edge_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/schema_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/sequence_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/view_catalog_entry.hpp"
-
+#include "duckdb/common/serializer.hpp"
+#include "duckdb/main/client_context.hpp"
+#include "duckdb/main/database.hpp"
 #include "duckdb/parser/parsed_data/create_schema_info.hpp"
 #include "duckdb/parser/parsed_data/create_table_info.hpp"
 #include "duckdb/parser/parsed_data/create_view_info.hpp"
-
 #include "duckdb/planner/binder.hpp"
 #include "duckdb/planner/parsed_data/bound_create_table_info.hpp"
-
-#include "duckdb/main/client_context.hpp"
-#include "duckdb/main/database.hpp"
-
-#include "duckdb/transaction/transaction_manager.hpp"
-
-#include "duckdb/storage/checkpoint/table_data_writer.hpp"
+#include "duckdb/storage/block_manager.hpp"
 #include "duckdb/storage/checkpoint/table_data_reader.hpp"
+#include "duckdb/storage/checkpoint/table_data_writer.hpp"
+#include "duckdb/storage/meta_block_reader.hpp"
+#include "duckdb/transaction/transaction_manager.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -81,7 +73,7 @@ void CheckpointManager::LoadFromStorage() {
 	context.transaction.BeginTransaction();
 	// create the MetaBlockReader to read from the storage
 	MetaBlockReader reader(buffer_manager, meta_block);
-	uint32_t schema_count = reader.Read<uint32_t>();
+	auto schema_count = reader.Read<uint32_t>();
 	for (uint32_t i = 0; i < schema_count; i++) {
 		ReadSchema(context, reader);
 	}
@@ -135,17 +127,17 @@ void CheckpointManager::ReadSchema(ClientContext &context, MetaBlockReader &read
 	database.catalog->CreateSchema(context, info.get());
 
 	// read the sequences
-	uint32_t seq_count = reader.Read<uint32_t>();
+	auto seq_count = reader.Read<uint32_t>();
 	for (uint32_t i = 0; i < seq_count; i++) {
 		ReadSequence(context, reader);
 	}
 	// read the table count and recreate the tables
-	uint32_t table_count = reader.Read<uint32_t>();
+	auto table_count = reader.Read<uint32_t>();
 	for (uint32_t i = 0; i < table_count; i++) {
 		ReadTable(context, reader);
 	}
 	// finally read the views
-	uint32_t view_count = reader.Read<uint32_t>();
+	auto view_count = reader.Read<uint32_t>();
 	for (uint32_t i = 0; i < view_count; i++) {
 		ReadView(context, reader);
 	}
@@ -154,11 +146,11 @@ void CheckpointManager::ReadSchema(ClientContext &context, MetaBlockReader &read
 //===--------------------------------------------------------------------===//
 // Views
 //===--------------------------------------------------------------------===//
-void CheckpointManager::WriteView(ViewCatalogEntry &view) {
+void CheckpointManager::WriteView(ViewCatalogEntry &view) const {
 	view.Serialize(*metadata_writer);
 }
 
-void CheckpointManager::ReadView(ClientContext &context, MetaBlockReader &reader) {
+void CheckpointManager::ReadView(ClientContext &context, MetaBlockReader &reader) const {
 	auto info = ViewCatalogEntry::Deserialize(reader);
 
 	database.catalog->CreateView(context, info.get());
@@ -167,11 +159,11 @@ void CheckpointManager::ReadView(ClientContext &context, MetaBlockReader &reader
 //===--------------------------------------------------------------------===//
 // Sequences
 //===--------------------------------------------------------------------===//
-void CheckpointManager::WriteSequence(SequenceCatalogEntry &seq) {
+void CheckpointManager::WriteSequence(SequenceCatalogEntry &seq) const {
 	seq.Serialize(*metadata_writer);
 }
 
-void CheckpointManager::ReadSequence(ClientContext &context, MetaBlockReader &reader) {
+void CheckpointManager::ReadSequence(ClientContext &context, MetaBlockReader &reader) const {
 	auto info = SequenceCatalogEntry::Deserialize(reader);
 
 	database.catalog->CreateSequence(context, info.get());
@@ -209,4 +201,26 @@ void CheckpointManager::ReadTable(ClientContext &context, MetaBlockReader &reade
 
 	// finally create the table in the catalog
 	database.catalog->CreateTable(context, bound_info.get());
+}
+
+//===--------------------------------------------------------------------===//
+// Edge Metadata
+//===--------------------------------------------------------------------===//
+void CheckpointManager::WriteEdge(Transaction &transaction, EdgeCatalogEntry &edge) const {
+	// write the edge meta data
+	edge.Serialize(*metadata_writer);
+	// todo: write rai index
+}
+
+void CheckpointManager::ReadEdge(ClientContext &context, MetaBlockReader &reader) const {
+	// deserialize the edge meta data
+	auto info = EdgeCatalogEntry::Deserialize(reader);
+	// bind the info
+	Binder binder(context);
+	auto bound_info = binder.BindCreateEdgeInfo(move(info));
+
+	// todo: re-construct the rai index
+
+	// finally create the edge in the catalog
+	database.catalog->CreateEdge(context, bound_info.get());
 }

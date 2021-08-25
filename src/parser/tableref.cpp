@@ -21,6 +21,12 @@ unique_ptr<TableRef> TableRef::Deserialize(Deserializer &source) {
 	case TableReferenceType::BASE_TABLE:
 		result = BaseTableRef::Deserialize(source);
 		break;
+	case TableReferenceType::VERTEX:
+		result = VertexRef::Deserialize(source);
+		break;
+	case TableReferenceType::EDGE:
+		result = EdgeRef::Deserialize(source);
+		break;
 	case TableReferenceType::CROSS_PRODUCT:
 		result = CrossProductRef::Deserialize(source);
 		break;
@@ -47,6 +53,6 @@ unique_ptr<TableRef> TableRef::Deserialize(Deserializer &source) {
 	return result;
 }
 
-void TableRef::Print() {
+void TableRef::Print() const {
 	Printer::Print(ToString());
 }

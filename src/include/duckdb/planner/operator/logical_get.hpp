@@ -11,14 +11,13 @@
 #include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
 #include "duckdb/planner/logical_operator.hpp"
 #include "duckdb/storage/data_table.hpp"
-#include "duckdb/storage/rai.hpp"
 
 namespace duckdb {
 
 //! LogicalGet represents a scan operation from a data source
 class LogicalGet : public LogicalOperator {
 public:
-	LogicalGet(idx_t table_index);
+	explicit LogicalGet(idx_t table_index);
 	LogicalGet(TableCatalogEntry *table, idx_t table_index);
 	LogicalGet(TableCatalogEntry *table, idx_t table_index, vector<column_t> column_ids);
 
@@ -39,6 +38,13 @@ public:
 public:
 	vector<ColumnBinding> GetColumnBindings() override;
 	ColumnBinding PushdownColumnBinding(ColumnBinding &binding) override;
+
+	unique_ptr<LogicalOperator> Copy() override {
+		auto get = make_unique<LogicalGet>(table, table_index, column_ids);
+		get->table_alias = table_alias;
+		get->tableFilters = tableFilters;
+		return get;
+	}
 
 protected:
 	void ResolveTypes() override;

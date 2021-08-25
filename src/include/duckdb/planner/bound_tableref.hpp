@@ -15,10 +15,9 @@ namespace duckdb {
 
 class BoundTableRef {
 public:
-	BoundTableRef(TableReferenceType type) : type(type) {
+	explicit BoundTableRef(TableReferenceType type) : type(type) {
 	}
-	virtual ~BoundTableRef() {
-	}
+	virtual ~BoundTableRef() = default;
 
 	//! The type of table reference
 	TableReferenceType type;

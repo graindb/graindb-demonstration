@@ -1,4 +1,4 @@
-add_library_unity(test_planner OBJECT test_projection_binding.cpp)
+add_library_unity(test_planner OBJECT test_path_binding.cpp test_projection_binding.cpp)
 set(ALL_OBJECT_FILES
-    ${ALL_OBJECT_FILES} $<TARGET_OBJECTS:test_planner>
-    PARENT_SCOPE)
+        ${ALL_OBJECT_FILES} $<TARGET_OBJECTS:test_planner>
+        PARENT_SCOPE)

@@ -22,13 +22,13 @@ bool TableBinding::HasMatchingBinding(const string &column_name) {
 BindResult TableBinding::Bind(ColumnRefExpression &colref, idx_t depth) {
 	auto entry = table.name_map.find(colref.column_name);
 	if (entry == table.name_map.end()) {
-		return BindResult(StringUtil::Format("Table \"%s\" does not have a column named \"%s\"",
+		return BindResult(StringUtil::Format(R"(Table "%s" does not have a column named "%s")",
 		                                     colref.table_name.c_str(), colref.column_name.c_str()));
 	}
 	auto col_index = entry->second;
 	// fetch the type of the column
 	SQLType col_type;
-	if (entry->second == COLUMN_IDENTIFIER_ROW_ID || colref.column_name.rfind("_", 0) == 0) {
+	if (entry->second == COLUMN_IDENTIFIER_ROW_ID || colref.column_name.rfind('_', 0) == 0) {
 		// row id: BIGINT type
 		col_type = SQLType::BIGINT;
 	} else {
@@ -77,7 +77,7 @@ GenericBinding::GenericBinding(const string &alias, vector<SQLType> coltypes, ve
 		auto &name = names[i];
 		assert(!name.empty());
 		if (name_map.find(name) != name_map.end()) {
-			throw BinderException("table \"%s\" has duplicate column name \"%s\"", alias.c_str(), name.c_str());
+			throw BinderException(R"(table "%s" has duplicate column name "%s")", alias.c_str(), name.c_str());
 		}
 		name_map[name] = i;
 	}
@@ -91,13 +91,13 @@ bool GenericBinding::HasMatchingBinding(const string &column_name) {
 BindResult GenericBinding::Bind(ColumnRefExpression &colref, idx_t depth) {
 	auto column_entry = name_map.find(colref.column_name);
 	if (column_entry == name_map.end()) {
-		return BindResult(StringUtil::Format("Values list \"%s\" does not have a column named \"%s\"", alias.c_str(),
+		return BindResult(StringUtil::Format(R"(Values list "%s" does not have a column named "%s")", alias.c_str(),
 		                                     colref.column_name.c_str()));
 	}
 	ColumnBinding binding;
 	binding.table_index = index;
 	binding.column_index = column_entry->second;
-//    binding.column_ordinal = column_entry->second;
+	// binding.column_ordinal = column_entry->second;
 	SQLType sql_type = types[column_entry->second];
 	return BindResult(
 	    make_unique<BoundColumnRefExpression>(colref.GetName(), GetInternalType(sql_type), binding, depth), sql_type);

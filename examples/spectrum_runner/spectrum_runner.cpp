@@ -48,7 +48,7 @@ public:
 		cout << "||    QUERY " << query_id << "    ||" << endl;
 		cout << "-------------------------------" << endl;
 		// Run query without rai
-		for (idx_t i = start_jos_id; i < num_jos; i++) {
+		for (auto i = start_jos_id; i < num_jos; i++) {
 			DuckDB db(nullptr);
 			Connection conn(db);
 			Initialize(conn, false);
@@ -58,7 +58,7 @@ public:
 			query_results.push_back(query_result);
 		}
 		// Run query with rai
-		for (idx_t i = start_jos_id; i < num_jos; i++) {
+		for (auto i = start_jos_id; i < num_jos; i++) {
 			DuckDB db(nullptr);
 			Connection conn(db);
 			Initialize(conn, true);
@@ -172,37 +172,9 @@ int main(int argc, char *argv[]) {
 	job_spectrum_runner.Run();
 }
 
-// QG1
-// + Q1a: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q01/ 1 1 225
-// + Q1b: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q01/ 2 1 225
-// * Q1c: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q01/ 3 1 225
-// * Q1d: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q01/ 4 1 255
-
-// QG2
-// + Q2a: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q02/ 5 1 225
-// + Q2b: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q02/ 6 1 225
-// STOPPED Q2c: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q02/ 7 1
-// Q2d: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q02/ 8 1 2
-
-// QG3
-// + Q3a: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q03/ 9 1 41
-// + Q3b: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q03/ 10 1 41
-// + Q3c: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q03/ 11 1 41
-
-// QG4
-// + Q4a: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q04/ 12 1 225
-// + Q4b: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q04/ 13 1 225
-// * Q4c: ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q04/ 14 1 225
-
-// QG5
-// + ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q05/ 15 1 225
-// + ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q05/ 16 1 225
-// + ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q05/ 17 1 255
-
-// QG6
-// + ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q06/ 18 1 225
-// * ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q06/ 19 1 225
-// * ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q06/ 20 1 255
-// * ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q06/ 21 1 255
-// ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q06/ 22 1 2
-// ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q06/ 23 1 2
+// ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q01/ 1 1 2
+// ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q02/ 5 1 2
+// ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q03/ 9 1 41
+// ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q04/ 12 1 2
+// ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q05/ 15 1 2
+// ./build/release/examples/spectrum_runner/spectrum_runner /home/g35jin/graindb-optimizer/job/jos/Q06/ 18 1 2

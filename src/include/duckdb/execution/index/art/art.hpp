@@ -11,17 +11,16 @@
 #include "duckdb/common/common.hpp"
 #include "duckdb/common/types/data_chunk.hpp"
 #include "duckdb/common/types/vector.hpp"
-#include "duckdb/parser/parsed_expression.hpp"
-#include "duckdb/storage/data_table.hpp"
-#include "duckdb/storage/index.hpp"
-
 #include "duckdb/execution/index/art/art_key.hpp"
 #include "duckdb/execution/index/art/leaf.hpp"
 #include "duckdb/execution/index/art/node.hpp"
-#include "duckdb/execution/index/art/node4.hpp"
 #include "duckdb/execution/index/art/node16.hpp"
-#include "duckdb/execution/index/art/node48.hpp"
 #include "duckdb/execution/index/art/node256.hpp"
+#include "duckdb/execution/index/art/node4.hpp"
+#include "duckdb/execution/index/art/node48.hpp"
+#include "duckdb/parser/parsed_expression.hpp"
+#include "duckdb/storage/data_table.hpp"
+#include "duckdb/storage/index.hpp"
 
 namespace duckdb {
 struct IteratorEntry {
@@ -41,7 +40,8 @@ struct Iterator {
 };
 
 struct ARTIndexScanState : public IndexScanState {
-	ARTIndexScanState(vector<column_t> column_ids) : IndexScanState(column_ids), checked(false), result_index(0) {
+	explicit ARTIndexScanState(vector<column_t> column_ids)
+	    : IndexScanState(column_ids), checked(false), result_index(0) {
 	}
 
 	Value values[2];
@@ -55,7 +55,7 @@ struct ARTIndexScanState : public IndexScanState {
 class ART : public Index {
 public:
 	ART(vector<column_t> column_ids, vector<unique_ptr<Expression>> unbound_expressions, bool is_unique = false);
-	~ART();
+	~ART() override;
 
 	//! Root of the tree
 	unique_ptr<Node> tree;

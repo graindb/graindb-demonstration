@@ -21,13 +21,13 @@ public:
 
 PhysicalHashJoin::PhysicalHashJoin(ClientContext &context, LogicalOperator &op, unique_ptr<PhysicalOperator> left,
                                    unique_ptr<PhysicalOperator> right, vector<JoinCondition> cond, JoinType join_type,
-                                   vector<idx_t> left_projection_map, vector<idx_t> right_projection_map)
+                                   const vector<idx_t> &left_projection_map, const vector<idx_t> &right_projection_map)
     : PhysicalComparisonJoin(op, PhysicalOperatorType::HASH_JOIN, move(cond), join_type),
       right_projection_map(right_projection_map) {
 	children.push_back(move(left));
 	children.push_back(move(right));
 
-	assert(left_projection_map.size() == 0);
+	assert(left_projection_map.empty());
 
 	hash_table =
 	    make_unique<JoinHashTable>(BufferManager::GetBufferManager(context), conditions,
@@ -49,7 +49,7 @@ void PhysicalHashJoin::BuildHashTable(ClientContext &context, PhysicalOperatorSt
 	DataChunk right_chunk, build_chunk;
 	right_chunk.Initialize(types);
 
-	if (right_projection_map.size() > 0) {
+	if (!right_projection_map.empty()) {
 		build_chunk.Initialize(hash_table->build_types);
 	}
 
@@ -63,7 +63,7 @@ void PhysicalHashJoin::BuildHashTable(ClientContext &context, PhysicalOperatorSt
 		// resolve the join keys for the right chunk
 		state->rhs_executor.Execute(right_chunk, state->join_keys);
 		// build the HT
-		if (right_projection_map.size() > 0) {
+		if (!right_projection_map.empty()) {
 			// there is a projection map: fill the build chunk with the projected columns
 			build_chunk.Reset();
 			build_chunk.SetCardinality(right_chunk);
@@ -76,10 +76,7 @@ void PhysicalHashJoin::BuildHashTable(ClientContext &context, PhysicalOperatorSt
 			hash_table->Build(state->join_keys, right_chunk);
 		}
 	}
-	// auto build_finalize_start = std::chrono::high_resolution_clock::now();
 	hash_table->Finalize();
-	// auto build_finalize_end = std::chrono::high_resolution_clock::now();
-	// build_finalize_time += (build_finalize_end - build_finalize_start).count();
 }
 
 void PhysicalHashJoin::ProbeHashTable(ClientContext &context, DataChunk &chunk, PhysicalOperatorState *state_) {
@@ -87,10 +84,7 @@ void PhysicalHashJoin::ProbeHashTable(ClientContext &context, DataChunk &chunk, 
 	if (state->child_chunk.size() > 0 && state->scan_structure) {
 		// still have elements remaining from the previous probe (i.e. we got
 		// >1024 elements in the previous probe)
-		// auto ht_next_start = std::chrono::high_resolution_clock::now();
 		state->scan_structure->Next(state->join_keys, state->child_chunk, chunk);
-		// auto ht_next_end = std::chrono::high_resolution_clock::now();
-		// ht_next_time += (ht_next_end - ht_next_start).count();
 		if (chunk.size() > 0) {
 			return;
 		}
@@ -154,22 +148,18 @@ void PhysicalHashJoin::ProbeHashTable(ClientContext &context, DataChunk &chunk, 
 			}
 		}
 		// resolve the join keys for the left chunk
-		// auto ht_expression_start = std::chrono::high_resolution_clock::now();
 		state->lhs_executor.Execute(state->child_chunk, state->join_keys);
 
 		// perform the actual probe
-		// auto ht_probe_start = std::chrono::high_resolution_clock::now();
 		state->scan_structure = hash_table->Probe(state->join_keys);
-		// auto ht_probe_end = std::chrono::high_resolution_clock::now();
 		state->scan_structure->Next(state->join_keys, state->child_chunk, chunk);
-		// auto ht_next_end = std::chrono::high_resolution_clock::now();
-		// ht_expr_time += (ht_probe_start - ht_expression_start).count();
-		// ht_probe_time += (ht_probe_end - ht_probe_start).count();
-		// ht_next_time += (ht_next_end - ht_probe_end).count();
 	} while (chunk.size() == 0);
 }
 
 unique_ptr<PhysicalOperatorState> PhysicalHashJoin::GetOperatorState() {
+	hash_table =
+	    make_unique<JoinHashTable>(hash_table->buffer_manager, conditions,
+	                               LogicalOperator::MapTypes(children[1]->GetTypes(), right_projection_map), type);
 	return make_unique<PhysicalHashJoinState>(children[0].get(), children[1].get(), conditions);
 }
 
@@ -177,12 +167,9 @@ void PhysicalHashJoin::GetChunkInternal(ClientContext &context, DataChunk &chunk
                                         SelectionVector *sel, Vector *rid_vector, DataChunk *rai_chunk) {
 	auto state = reinterpret_cast<PhysicalHashJoinState *>(state_);
 	if (!state->initialized) {
-		// auto build_start = std::chrono::high_resolution_clock::now();
 		state->cached_chunk.Initialize(types);
 		BuildHashTable(context, state_);
 		state->initialized = true;
-		// auto build_end = std::chrono::high_resolution_clock::now();
-		// build_time += (build_end - build_start).count();
 		if (hash_table->size() == 0 &&
 		    (hash_table->join_type == JoinType::INNER || hash_table->join_type == JoinType::SEMI)) {
 			// empty hash table with INNER or SEMI join means empty result set
@@ -190,10 +177,7 @@ void PhysicalHashJoin::GetChunkInternal(ClientContext &context, DataChunk &chunk
 		}
 	}
 	do {
-		// auto probe_start = std::chrono::high_resolution_clock::now();
 		ProbeHashTable(context, chunk, state);
-		// auto probe_end = std::chrono::high_resolution_clock::now();
-		// probe_time += (probe_end - probe_start).count();
 #if STANDARD_VECTOR_SIZE >= 128
 		if (chunk.size() == 0) {
 			if (state->cached_chunk.size() > 0) {
@@ -224,11 +208,11 @@ void PhysicalHashJoin::GetChunkInternal(ClientContext &context, DataChunk &chunk
 }
 
 string PhysicalHashJoin::ExtraRenderInformation() const {
-	string extra_info = "HASH_JOIN[";
+	string extra_info = "HJ[";
 	extra_info += JoinTypeToString(type);
 	extra_info += ", build: ";
 	extra_info +=
-	    to_string(right_projection_map.size() == 0 ? children[1]->GetTypes().size() : right_projection_map.size());
+	    to_string(right_projection_map.empty() ? children[1]->GetTypes().size() : right_projection_map.size());
 	extra_info += "]\n";
 	for (auto &it : conditions) {
 		string op = ExpressionTypeToOperator(it.comparison);

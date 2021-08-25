@@ -11,9 +11,9 @@
 #include "duckdb/common/constants.hpp"
 
 #include <algorithm>
-#include <string.h>
 #include <limits>
 #include <sstream>
+#include <string.h>
 
 #ifdef _MSC_VER
 #define suint64_t int64_t
@@ -21,13 +21,13 @@
 
 namespace duckdb {
 #if !defined(_MSC_VER) && (__cplusplus < 201402L)
-template <typename T, typename... Args> unique_ptr<T> make_unique(Args &&... args) {
+template <typename T, typename... Args> unique_ptr<T> make_unique(Args &&...args) {
 	return unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 #else // Visual Studio has make_unique
 using std::make_unique;
 #endif
-template <typename S, typename T, typename... Args> unique_ptr<S> make_unique_base(Args &&... args) {
+template <typename S, typename T, typename... Args> unique_ptr<S> make_unique_base(Args &&...args) {
 	return unique_ptr<S>(new T(std::forward<Args>(args)...));
 }
 

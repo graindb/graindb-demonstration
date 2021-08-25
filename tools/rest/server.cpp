@@ -1,20 +1,21 @@
+#include "duckdb.hpp"
+#include "duckdb/common/string_util.hpp"
+#include "duckdb/common/types/data_chunk.hpp"
+#include "duckdb/common/unordered_map.hpp"
+#include "duckdb/common/vector_operations/vector_operations.hpp"
+#include "duckdb/main/client_context.hpp"
+
 #include <chrono>
 #include <cstdio>
-#include <thread>
 #include <iostream>
-
-#include "duckdb.hpp"
-#include "duckdb/common/types/data_chunk.hpp"
-#include "duckdb/common/vector_operations/vector_operations.hpp"
-#include "duckdb/common/unordered_map.hpp"
-#include "duckdb/common/string_util.hpp"
-#include "duckdb/main/client_context.hpp"
+#include <thread>
 
 // you can set this to enable compression. You will need to link zlib as well.
 // #define CPPHTTPLIB_ZLIB_SUPPORT 1
 
 #include "httplib.hpp"
 #include "json.hpp"
+#include "prepare_data.h"
 
 #include <unordered_map>
 
@@ -32,7 +33,6 @@ void print_help() {
 	fprintf(stderr, "          --fetch_timeout=[sec] result set timeout in seconds\n");
 	fprintf(stderr, "          --log=[file]          log queries to file\n\n");
 	fprintf(stderr, "Version: %s\n", DUCKDB_SOURCE_ID);
-
 }
 
 // https://stackoverflow.com/a/12468109/2652376
@@ -309,9 +309,19 @@ int main(int argc, char **argv) {
 	}
 
 	DuckDB duckdb(dbfile.empty() ? nullptr : dbfile.c_str(), &config);
+	Connection prepare_conn(duckdb);
+	for (auto &statement : prepare_statements) {
+		auto result = prepare_conn.Query(statement);
+		if (!result->success) {
+			fprintf(stderr, "Error: prepare statement '%s' is not executed successfully\n", statement.c_str());
+			fprintf(stderr, "%s\n", result->error.c_str());
+			exit(1);
+		}
+	}
 
 	svr.Get("/query", [&](const Request &req, Response &resp) {
 		auto q = req.get_param_value("q");
+		cout << "Executing: " << q << endl;
 		{
 			std::lock_guard<std::mutex> guard(out_mutex);
 			logfile << q << " ; -- DFgoEnx9UIRgHFsVYW8K" << std::endl
@@ -328,6 +338,7 @@ int main(int argc, char **argv) {
 
 		std::thread interrupt_thread(sleep_thread, state.con.get(), &is_active, query_timeout);
 		auto res = state.con->context->Query(q, true);
+		cout << res->ToString() << endl;
 
 		is_active = false;
 		interrupt_thread.join();

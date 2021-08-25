@@ -1,7 +1,7 @@
 #pragma once
 
-#include "duckdb/common/string_util.hpp"
 #include "duckdb.hpp"
+#include "duckdb/common/string_util.hpp"
 
 namespace duckdb {
 
@@ -16,7 +16,7 @@ bool parse_datachunk(string csv, DataChunk &result, vector<SQLType> sql_types, b
 
 //! Compares the result of a pipe-delimited CSV with the given DataChunk
 //! Returns true if they are equal, and stores an error_message otherwise
-bool compare_result(string csv, ChunkCollection &collection, vector<SQLType> sql_types, bool has_header,
+bool compare_result(const string &csv, ChunkCollection &collection, const vector<SQLType> &sql_types, bool has_header,
                     string &error_message);
 
 } // namespace duckdb

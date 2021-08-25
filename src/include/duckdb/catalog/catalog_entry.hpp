@@ -11,7 +11,9 @@
 #include "duckdb/common/common.hpp"
 #include "duckdb/common/enums/catalog_type.hpp"
 #include "duckdb/common/exception.hpp"
+
 #include <memory>
+#include <utility>
 
 namespace duckdb {
 struct AlterInfo;
@@ -23,8 +25,8 @@ class ClientContext;
 class CatalogEntry {
 public:
 	CatalogEntry(CatalogType type, Catalog *catalog, string name)
-	    : type(type), catalog(catalog), set(nullptr), name(name), oid(0), deleted(false), temporary(false),
-	      parent(nullptr) {
+	    : type(type), catalog(catalog), set(nullptr), name(move(name)), oid(0), deleted(false), temporary(false),
+	      timestamp(0), parent(nullptr) {
 	}
 	virtual ~CatalogEntry();
 

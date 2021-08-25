@@ -1,4 +1,5 @@
 #include "duckdb/parser/parsed_data/alter_table_info.hpp"
+
 #include "duckdb/common/serializer.hpp"
 
 using namespace duckdb;
@@ -85,6 +86,19 @@ void AddColumnInfo::Serialize(Serializer &serializer) {
 }
 
 unique_ptr<AlterInfo> AddColumnInfo::Deserialize(Deserializer &source, string schema, string table) {
+	auto new_column = ColumnDefinition::Deserialize(source);
+	return make_unique<AddColumnInfo>(schema, table, move(new_column));
+}
+
+//===--------------------------------------------------------------------===//
+// AddJoinIndexColumnInfo
+//===--------------------------------------------------------------------===//
+void AddJoinIndexColumnInfo::Serialize(Serializer &serializer) {
+	AlterTableInfo::Serialize(serializer);
+	new_column.Serialize(serializer);
+}
+
+unique_ptr<AlterInfo> AddJoinIndexColumnInfo::Deserialize(Deserializer &source, string schema, string table) {
 	auto new_column = ColumnDefinition::Deserialize(source);
 	return make_unique<AddColumnInfo>(schema, table, move(new_column));
 }

@@ -3,7 +3,6 @@
 #include "duckdb/parser/statement/list.hpp"
 #include "duckdb/planner/bound_query_node.hpp"
 #include "duckdb/planner/bound_tableref.hpp"
-#include "duckdb/planner/expression.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -108,6 +107,8 @@ unique_ptr<BoundTableRef> Binder::Bind(TableRef &ref) {
 		return Bind((CrossProductRef &)ref);
 	case TableReferenceType::JOIN:
 		return Bind((JoinRef &)ref);
+	case TableReferenceType::PATH_PATTERN:
+		return Bind((PathJoinRef &)ref);
 	case TableReferenceType::SUBQUERY:
 		return Bind((SubqueryRef &)ref);
 	case TableReferenceType::EMPTY:
@@ -116,6 +117,8 @@ unique_ptr<BoundTableRef> Binder::Bind(TableRef &ref) {
 		return Bind((TableFunctionRef &)ref);
 	case TableReferenceType::EXPRESSION_LIST:
 		return Bind((ExpressionListRef &)ref);
+	case TableReferenceType::VERTEX:
+		return Bind((VertexRef &)ref);
 	default:
 		throw Exception("Unknown table ref type");
 	}
@@ -139,8 +142,10 @@ unique_ptr<LogicalOperator> Binder::CreatePlan(BoundTableRef &ref) {
 		return CreatePlan((BoundExpressionListRef &)ref);
 	case TableReferenceType::CTE:
 		return CreatePlan((BoundCTERef &)ref);
+	case TableReferenceType::VERTEX:
+		return CreatePlan((BoundVertexRef &)ref);
 	default:
-		throw Exception("Unsupported bound table ref type type");
+		throw Exception("Unsupported bound table ref type");
 	}
 }
 
@@ -191,7 +196,7 @@ ExpressionBinder *Binder::GetActiveBinder() {
 }
 
 bool Binder::HasActiveBinder() {
-	return GetActiveBinders().size() > 0;
+	return !GetActiveBinders().empty();
 }
 
 vector<ExpressionBinder *> &Binder::GetActiveBinders() {
@@ -207,12 +212,12 @@ void Binder::MoveCorrelatedExpressions(Binder &other) {
 }
 
 void Binder::MergeCorrelatedColumns(vector<CorrelatedColumnInfo> &other) {
-	for (idx_t i = 0; i < other.size(); i++) {
-		AddCorrelatedColumn(other[i]);
+	for (auto &i : other) {
+		AddCorrelatedColumn(i);
 	}
 }
 
-void Binder::AddCorrelatedColumn(CorrelatedColumnInfo info) {
+void Binder::AddCorrelatedColumn(const CorrelatedColumnInfo &info) {
 	// we only add correlated columns to the list if they are not already there
 	if (std::find(correlated_columns.begin(), correlated_columns.end(), info) == correlated_columns.end()) {
 		correlated_columns.push_back(info);

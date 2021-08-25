@@ -16,16 +16,15 @@ namespace duckdb {
 //! A ResultModifier
 class BoundResultModifier {
 public:
-	BoundResultModifier(ResultModifierType type) : type(type) {
+	explicit BoundResultModifier(ResultModifierType type) : type(type) {
 	}
-	virtual ~BoundResultModifier() {
-	}
+	virtual ~BoundResultModifier() = default;
 
 	ResultModifierType type;
 };
 
 struct BoundOrderByNode {
-	BoundOrderByNode() {
+	BoundOrderByNode() : type(OrderType::INVALID) {
 	}
 	BoundOrderByNode(OrderType type, unique_ptr<Expression> expression) : type(type), expression(move(expression)) {
 	}

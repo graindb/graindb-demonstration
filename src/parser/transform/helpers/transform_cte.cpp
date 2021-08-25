@@ -8,13 +8,13 @@
 using namespace duckdb;
 using namespace std;
 
-void Transformer::TransformCTE(PGWithClause *de_with_clause, SelectStatement &select) {
+void Transformer::TransformCTE(duckdb_libpgquery::PGWithClause *de_with_clause, SelectStatement &select) {
 	// TODO: might need to update in case of future lawsuit
 	assert(de_with_clause);
 
 	assert(de_with_clause->ctes);
 	for (auto cte_ele = de_with_clause->ctes->head; cte_ele != NULL; cte_ele = cte_ele->next) {
-		auto cte = reinterpret_cast<PGCommonTableExpr *>(cte_ele->data.ptr_value);
+		auto cte = reinterpret_cast<duckdb_libpgquery::PGCommonTableExpr *>(cte_ele->data.ptr_value);
 		// lets throw some errors on unsupported features early
 
 		if (cte->aliascolnames) {
@@ -33,7 +33,7 @@ void Transformer::TransformCTE(PGWithClause *de_with_clause, SelectStatement &se
 			throw NotImplementedException("CTE collations not supported");
 		}
 		// we need a query
-		if (!cte->ctequery || cte->ctequery->type != T_PGSelectStmt) {
+		if (!cte->ctequery || cte->ctequery->type != duckdb_libpgquery::T_PGSelectStmt) {
 			throw Exception("A CTE needs a SELECT");
 		}
 
@@ -44,7 +44,7 @@ void Transformer::TransformCTE(PGWithClause *de_with_clause, SelectStatement &se
 		if (cte->cterecursive || de_with_clause->recursive) {
 			cte_select = TransformRecursiveCTE(cte);
 		} else {
-			cte_select = TransformSelectNode((PGSelectStmt *)cte->ctequery);
+			cte_select = TransformSelectNode((duckdb_libpgquery::PGSelectStmt *)cte->ctequery);
 		}
 
 		if (!cte_select) {
@@ -61,14 +61,14 @@ void Transformer::TransformCTE(PGWithClause *de_with_clause, SelectStatement &se
 	}
 }
 
-unique_ptr<QueryNode> Transformer::TransformRecursiveCTE(PGCommonTableExpr *cte) {
-	auto stmt = (PGSelectStmt *)cte->ctequery;
+unique_ptr<QueryNode> Transformer::TransformRecursiveCTE(duckdb_libpgquery::PGCommonTableExpr *cte) {
+	auto stmt = (duckdb_libpgquery::PGSelectStmt *)cte->ctequery;
 
 	unique_ptr<QueryNode> node;
 	switch (stmt->op) {
-	case PG_SETOP_UNION:
-	case PG_SETOP_EXCEPT:
-	case PG_SETOP_INTERSECT: {
+	case duckdb_libpgquery::PG_SETOP_UNION:
+	case duckdb_libpgquery::PG_SETOP_EXCEPT:
+	case duckdb_libpgquery::PG_SETOP_INTERSECT: {
 		node = make_unique<RecursiveCTENode>();
 		auto result = (RecursiveCTENode *)node.get();
 		result->ctename = string(cte->ctename);
@@ -82,7 +82,7 @@ unique_ptr<QueryNode> Transformer::TransformRecursiveCTE(PGCommonTableExpr *cte)
 
 		bool select_distinct = true;
 		switch (stmt->op) {
-		case PG_SETOP_UNION:
+		case duckdb_libpgquery::PG_SETOP_UNION:
 			// We don't need a DISTINCT operation on top of a recursive UNION CTE.
 			select_distinct = false;
 			break;
@@ -98,7 +98,7 @@ unique_ptr<QueryNode> Transformer::TransformRecursiveCTE(PGCommonTableExpr *cte)
 	}
 	default:
 		// This CTE is not recursive. Fallback to regular query transformation.
-		return TransformSelectNode((PGSelectStmt *)cte->ctequery);
+		return TransformSelectNode((duckdb_libpgquery::PGSelectStmt *)cte->ctequery);
 	}
 
 	if (stmt->limitCount) {

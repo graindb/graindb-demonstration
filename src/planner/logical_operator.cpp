@@ -7,8 +7,8 @@ using namespace duckdb;
 using namespace std;
 
 string LogicalOperator::ParamsToString() const {
-	string result = "";
-	if (expressions.size() > 0) {
+	string result;
+	if (!expressions.empty()) {
 		result += "[";
 		result += StringUtil::Join(expressions, expressions.size(), ", ",
 		                           [](const unique_ptr<Expression> &expression) { return expression->GetName(); });
@@ -35,13 +35,13 @@ void LogicalOperator::ResolveOperatorTypes() {
 vector<ColumnBinding> LogicalOperator::GenerateColumnBindings(idx_t table_idx, idx_t column_count) {
 	vector<ColumnBinding> result;
 	for (idx_t i = 0; i < column_count; i++) {
-		result.push_back(ColumnBinding(table_idx, i));
+		result.emplace_back(table_idx, i);
 	}
 	return result;
 }
 
-vector<TypeId> LogicalOperator::MapTypes(vector<TypeId> types, vector<idx_t> projection_map) {
-	if (projection_map.size() == 0) {
+vector<TypeId> LogicalOperator::MapTypes(vector<TypeId> types, const vector<idx_t> &projection_map) {
+	if (projection_map.empty()) {
 		return types;
 	} else {
 		vector<TypeId> result_types;
@@ -52,8 +52,9 @@ vector<TypeId> LogicalOperator::MapTypes(vector<TypeId> types, vector<idx_t> pro
 	}
 }
 
-vector<ColumnBinding> LogicalOperator::MapBindings(vector<ColumnBinding> bindings, vector<idx_t> projection_map) {
-	if (projection_map.size() == 0) {
+vector<ColumnBinding> LogicalOperator::MapBindings(vector<ColumnBinding> bindings,
+                                                   const vector<idx_t> &projection_map) {
+	if (projection_map.empty()) {
 		return bindings;
 	} else {
 		vector<ColumnBinding> result_bindings;
@@ -67,10 +68,9 @@ vector<ColumnBinding> LogicalOperator::MapBindings(vector<ColumnBinding> binding
 string LogicalOperator::ToString(idx_t depth) const {
 	string result = LogicalOperatorToString(type);
 	result += ParamsToString();
-	if (children.size() > 0) {
-		for (idx_t i = 0; i < children.size(); i++) {
+	if (!children.empty()) {
+		for (const auto &child : children) {
 			result += "\n" + string(depth * 4, ' ');
-			auto &child = children[i];
 			result += child->ToString(depth + 1);
 		}
 		result += "";
@@ -79,10 +79,10 @@ string LogicalOperator::ToString(idx_t depth) const {
 }
 
 static string ToJSONRecursive(const LogicalOperator &node) {
-	string result = "{ \"name\": \"" + LogicalOperatorToString(node.type) + "\",\n";
+	string result = R"({ "name": ")" + LogicalOperatorToString(node.type) + "\",\n";
 	result += "\"timing\":" + StringUtil::Format("%.2f", 0) + ",\n";
 	result += "\"cardinality\":" + to_string(0) + ",\n";
-	result += "\"extra_info\": \"" + node.ParamsToString() + "\",\n";
+	result += R"("extra_info": ")" + node.ParamsToString() + "\",\n";
 	result += "\"children\": [";
 	result += StringUtil::Join(node.children, node.children.size(), ",\n",
 	                           [](const unique_ptr<LogicalOperator> &child) { return ToJSONRecursive(*child); });
@@ -101,6 +101,6 @@ string LogicalOperator::ToJSON() const {
 	return result + "}";
 }
 
-void LogicalOperator::Print() {
+void LogicalOperator::Print() const {
 	Printer::Print(ToString());
 }

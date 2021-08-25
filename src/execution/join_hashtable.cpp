@@ -39,7 +39,7 @@ JoinHashTable::JoinHashTable(BufferManager &buffer_manager, vector<JoinCondition
 		condition_size += type_size;
 	}
 	// at least one equality is necessary
-	assert(equality_types.size() > 0);
+	assert(!equality_types.empty());
 
 	if (join_type == JoinType::ANTI || join_type == JoinType::SEMI || join_type == JoinType::MARK) {
 		// for ANTI, SEMI and MARK join, we only need to store the keys
@@ -71,7 +71,7 @@ JoinHashTable::~JoinHashTable() {
 	}
 }
 
-void JoinHashTable::ApplyBitmask(Vector &hashes, idx_t count) {
+void JoinHashTable::ApplyBitmask(Vector &hashes, idx_t count) const {
 	if (hashes.vector_type == VectorType::CONSTANT_VECTOR) {
 		assert(!ConstantVector::IsNull(hashes));
 		auto indices = ConstantVector::GetData<hash_t>(hashes);
@@ -100,7 +100,7 @@ void JoinHashTable::ApplyBitmask(Vector &hashes, const SelectionVector &sel, idx
 	}
 }
 
-void JoinHashTable::Hash(DataChunk &keys, const SelectionVector &sel, idx_t count, Vector &hashes) {
+void JoinHashTable::Hash(DataChunk &keys, const SelectionVector &sel, idx_t count, Vector &hashes) const {
 	if (count == keys.size()) {
 		// no null values are filtered: use regular hash functions
 		VectorOperations::Hash(keys.data[0], hashes, keys.size());
@@ -205,7 +205,7 @@ void JoinHashTable::SerializeVector(Vector &v, idx_t vcount, const SelectionVect
 }
 
 idx_t JoinHashTable::AppendToBlock(HTDataBlock &block, BufferHandle &handle, vector<BlockAppendEntry> &append_entries,
-                                   idx_t remaining) {
+                                   idx_t remaining) const {
 	idx_t append_count = std::min(remaining, block.capacity - block.count);
 	auto dataptr = handle.node->buffer + block.count * entry_size;
 	append_entries.emplace_back(dataptr, append_count);
@@ -247,7 +247,7 @@ idx_t JoinHashTable::PrepareKeys(DataChunk &keys, unique_ptr<VectorData[]> &key_
 }
 
 void JoinHashTable::Build(DataChunk &keys, DataChunk &payload) {
-	assert(!finalized);
+	// assert(!finalized);
 	assert(keys.size() == payload.size());
 	if (keys.size() == 0) {
 		return;
@@ -913,7 +913,7 @@ void ScanStructure::NextMarkJoin(DataChunk &keys, DataChunk &input, DataChunk &r
 		// set the entries to either true or false based on whether a match was found
 		for (idx_t i = 0; i < input.size(); i++) {
 			assert(count_star[i] >= count[i]);
-			bool_result[i] = found_match ? found_match[i] : false;
+			bool_result[i] = found_match && found_match[i];
 			if (!bool_result[i] && count_star[i] > count[i]) {
 				// RHS has NULL value and result is false: set to null
 				nullmask[i] = true;

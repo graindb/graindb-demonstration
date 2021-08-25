@@ -93,7 +93,7 @@ public:
 	void Slice(DataChunk &other, const SelectionVector &sel, idx_t count, idx_t col_offset, idx_t column_num);
 	void Slice(DataChunk &other, const SelectionVector &sel, idx_t count, idx_t col_offset, vector<idx_t> &projection);
 
-		//! Resets the DataChunk to its state right after the DataChunk::Initialize
+	//! Resets the DataChunk to its state right after the DataChunk::Initialize
 	//! function was called. This sets the count to 0, and resets each member
 	//! Vector to point back to the data owned by this DataChunk.
 	void Reset();
@@ -111,7 +111,7 @@ public:
 
 	//! Converts this DataChunk to a printable string representation
 	string ToString() const;
-	void Print();
+	void Print() const;
 
 	DataChunk(const DataChunk &) = delete;
 

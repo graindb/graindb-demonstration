@@ -1,6 +1,8 @@
 #include "duckdb/optimizer/join_order_optimizer.hpp"
 
+#include "duckdb/catalog/catalog_entry/vertex_catalog_entry.hpp"
 #include "duckdb/main/client_context.hpp"
+#include "duckdb/planner/column_binding.hpp"
 #include "duckdb/planner/expression/list.hpp"
 #include "duckdb/planner/expression_iterator.hpp"
 #include "duckdb/planner/operator/list.hpp"
@@ -10,7 +12,6 @@
 using namespace duckdb;
 using namespace std;
 
-using json = nlohmann::json;
 using JoinNode = JoinOrderOptimizer::JoinNode;
 
 //! Returns true if A and B are disjoint, false otherwise
@@ -135,8 +136,7 @@ bool JoinOrderOptimizer::ExtractJoinRelations(LogicalOperator &input_op, vector<
 	} else if (op->type == LogicalOperatorType::GET) {
 		// base table scan, add to set of relations
 		auto get = (LogicalGet *)op;
-		auto table_oid = get->table == nullptr ? 0 : get->table->oid;
-		auto relation = make_unique<SingleJoinRelation>(&input_op, parent, table_oid);
+		auto relation = make_unique<SingleJoinRelation>(&input_op, parent);
 		auto relation_index = relations.size();
 		relation_mapping[get->table_index] = relation_index;
 		relation_alias_mapping[get->table_alias] = relation_index;
@@ -158,7 +158,7 @@ bool JoinOrderOptimizer::ExtractJoinRelations(LogicalOperator &input_op, vector<
 		return true;
 	} else if (op->type == LogicalOperatorType::PROJECTION) {
 		auto proj = (LogicalProjection *)op;
-		// we run the join order optimizer witin the subquery as well
+		// we run the join order optimizer within the subquery as well
 		JoinOrderOptimizer optimizer(context);
 		op->children[0] = optimizer.Optimize(move(op->children[0]));
 		// projection, add to the set of relations
@@ -188,7 +188,7 @@ unique_ptr<JoinNode> JoinOrderOptimizer::CreateJoinTree(JoinRelationSet *set, Ne
 		return CreateJoinTree(set, info, right, left);
 	}
 	idx_t expected_cardinality, expected_cost = 0;
-	if (info->filters.size() == 0) {
+	if (info->filters.empty()) {
 		// cross product
 		expected_cardinality = left->cardinality * right->cardinality;
 		expected_cost = expected_cardinality;
@@ -255,7 +255,7 @@ bool JoinOrderOptimizer::EmitCSG(JoinRelationSet *node) {
 	UpdateExclusionSet(node, exclusion_set);
 	// find the neighbors given this exclusion set
 	auto neighbors = query_graph.GetNeighbors(node, exclusion_set);
-	if (neighbors.size() == 0) {
+	if (neighbors.empty()) {
 		return true;
 	}
 	// we iterate over the neighbors ordered by their first node
@@ -282,7 +282,7 @@ bool JoinOrderOptimizer::EnumerateCmpRecursive(JoinRelationSet *left, JoinRelati
                                                unordered_set<idx_t> exclusion_set) {
 	// get the neighbors of the second relation under the exclusion set
 	auto neighbors = query_graph.GetNeighbors(right, exclusion_set);
-	if (neighbors.size() == 0) {
+	if (neighbors.empty()) {
 		return true;
 	}
 	vector<JoinRelationSet *> union_sets;
@@ -316,7 +316,7 @@ bool JoinOrderOptimizer::EnumerateCmpRecursive(JoinRelationSet *left, JoinRelati
 bool JoinOrderOptimizer::EnumerateCSGRecursive(JoinRelationSet *node, unordered_set<idx_t> &exclusion_set) {
 	// find neighbors of S under the exlusion set
 	auto neighbors = query_graph.GetNeighbors(node, exclusion_set);
-	if (neighbors.size() == 0) {
+	if (neighbors.empty()) {
 		return true;
 	}
 	// now first emit the connected subgraphs of the neighbors
@@ -422,7 +422,7 @@ void JoinOrderOptimizer::SolveJoinOrderApproximately() {
 			assert(smallest_index[0] != smallest_index[1]);
 			auto left = smallest_plans[0]->set, right = smallest_plans[1]->set;
 			// create a cross product edge (i.e. edge with empty filter) between these two sets in the query graph
-			query_graph.CreateEdge(left, right, nullptr, false);
+			query_graph.CreateEdge(left, right, nullptr);
 			// now emit the pair and continue with the algorithm
 			auto connection = query_graph.GetConnection(left, right);
 			assert(connection);
@@ -456,11 +456,11 @@ void JoinOrderOptimizer::SolveJoinOrder() {
 }
 
 JoinRelationSet *JoinOrderOptimizer::InjectJoinNode(unique_ptr<JoinOrderNode> join_order) {
-	switch (join_order->op_mark) {
-	case OpMark::NLJ:
-	case OpMark::HASH_JOIN:
-	case OpMark::SIP_JOIN:
-	case OpMark::JOIN: {
+	switch (join_order->op_hint) {
+	case OpHint::NLJ:
+	case OpHint::HJ:
+	case OpHint::SJ:
+	case OpHint::JOIN: {
 		auto left_set = InjectJoinNode(move(join_order->children[0]));
 		auto right_set = InjectJoinNode(move(join_order->children[1]));
 		auto new_set = set_manager.Union(left_set, right_set);
@@ -469,19 +469,19 @@ JoinRelationSet *JoinOrderOptimizer::InjectJoinNode(unique_ptr<JoinOrderNode> jo
 		auto neighbor_info = query_graph.GetConnection(left_set, right_set);
 		auto cardinality = std::max(left_node->cardinality, right_node->cardinality);
 		auto node = make_unique<JoinNode>(new_set, neighbor_info, left_node, right_node, cardinality, cardinality,
-		                                  join_order->op_mark);
+		                                  join_order->op_hint);
 		plans[new_set] = move(node);
 
 		return new_set;
 	}
-	case OpMark::SCAN:
-	case OpMark::NO_OP: {
+	case OpHint::SCAN:
+	case OpHint::NO_OP: {
 		auto relation = set_manager.GetJoinRelation(join_order->relation_id);
-		plans[relation]->op_mark = join_order->op_mark;
+		plans[relation]->op_hint = join_order->op_hint;
 		return relation;
 	}
 	default: {
-		return nullptr; // error! todo: throw exception
+		throw InternalException("InjectJoinNode with invalid join types!");
 	}
 	}
 }
@@ -525,8 +525,8 @@ void JoinOrderOptimizer::GenerateCrossProducts() {
 		for (idx_t j = 0; j < relations.size(); j++) {
 			if (i != j) {
 				auto right = set_manager.GetJoinRelation(j);
-				query_graph.CreateEdge(left, right, nullptr, false);
-				query_graph.CreateEdge(right, left, nullptr, false);
+				query_graph.CreateEdge(left, right, nullptr);
+				query_graph.CreateEdge(right, left, nullptr);
 			}
 		}
 	}
@@ -545,6 +545,124 @@ static unique_ptr<LogicalOperator> ExtractJoinRelation(SingleJoinRelation &rel) 
 	throw Exception("Could not find relation in parent node (?)");
 }
 
+//! Return nullptr is the input_op is not single branch or the base is not a simple GET
+static LogicalGet *ExtractBaseGetOp(LogicalOperator *input_op) {
+	switch (input_op->type) {
+	case LogicalOperatorType::FILTER:
+	case LogicalOperatorType::PROJECTION: {
+		return ExtractBaseGetOp(input_op->children[0].get());
+	}
+	case LogicalOperatorType::GET: {
+		return reinterpret_cast<LogicalGet *>(input_op);
+	}
+	default:
+		return nullptr;
+	}
+}
+
+void JoinOrderOptimizer::TryMatchEdge(LogicalComparisonJoin *join, JoinCondition &cond) {
+	auto &left_binding = reinterpret_cast<BoundColumnRefExpression *>(cond.left.get())->binding;
+	auto &right_binding = reinterpret_cast<BoundColumnRefExpression *>(cond.right.get())->binding;
+	auto left_op = relations[relation_mapping[left_binding.table_index]]->op;
+	auto right_op = relations[relation_mapping[right_binding.table_index]]->op;
+	auto cond_left_op = ExtractBaseGetOp(left_op);
+	auto cond_right_op = ExtractBaseGetOp(right_op);
+	unique_ptr<RelAdjIndexInfo> rai_index_info;
+	bool is_left_edge = false;
+	if (cond_left_op && cond_right_op) {
+		auto left_table = reinterpret_cast<LogicalGet *>(cond_left_op)->table;
+		auto right_table = reinterpret_cast<LogicalGet *>(cond_right_op)->table;
+		if (left_table == nullptr || right_table == nullptr) {
+			return;
+		}
+		// LEFT is the edge
+		if (!left_table->correlated_edges.empty()) {
+			for (auto &edge : left_table->correlated_edges) {
+				bool is_self_join = false;
+				if (right_table == edge->edge_table && (right_table == edge->vertices[1]->base_table)) {
+					// SELF JOIN
+					assert(right_table == edge->vertices[1]->base_table);
+					is_self_join = true;
+				}
+				if (left_binding.column_ordinal == edge->reference_column_ids[0] &&
+				    right_table == edge->vertices[0]->base_table &&
+				    right_binding.column_ordinal == edge->vertices[0]->base_table->primary_key_column) {
+					rai_index_info = make_unique<RelAdjIndexInfo>(
+					    edge->rai_index, is_self_join ? RAILRInfo::SELF : RAILRInfo::EDGE_SOURCE, true, right_table);
+					if (matched_edges.find(left_binding.table_index) != matched_edges.end()) {
+						auto matched_cond = matched_edges[left_binding.table_index];
+						// When top is EDGE_SOURCE, and the direct/indirect child is EDGE_DEST, do extended vertex pass
+						if (matched_cond->rai_info->rai_lr_info == RAILRInfo::EDGE_DEST) {
+							auto matched_cond_right =
+							    reinterpret_cast<BoundColumnRefExpression *>(matched_cond->right.get())->binding;
+							rai_index_info->passing_table = matched_cond_right.table_index;
+							rai_index_info->cardinality = matched_cond_right.table->storage->info->cardinality;
+							rai_index_info->extended_vertex_passing = true;
+						}
+					} else {
+						rai_index_info->passing_table = left_binding.table_index;
+						rai_index_info->cardinality = left_table->storage->info->cardinality;
+					}
+					break;
+				} else if (left_binding.column_ordinal == edge->reference_column_ids[1] &&
+				           right_table == edge->vertices[1]->base_table &&
+				           right_binding.column_ordinal == edge->vertices[1]->base_table->primary_key_column) {
+					rai_index_info = make_unique<RelAdjIndexInfo>(
+					    edge->rai_index, is_self_join ? RAILRInfo::SELF : RAILRInfo::EDGE_DEST, false, right_table);
+					if (matched_edges.find(left_binding.table_index) != matched_edges.end()) {
+						auto matched_cond = matched_edges[left_binding.table_index];
+						// When top is EDGE_DEST, and the direct/indirect child is EDGE_SOURCE, do extended vertex pass
+						if (matched_cond->rai_info->rai_lr_info == RAILRInfo::EDGE_SOURCE) {
+							auto matched_cond_right =
+							    reinterpret_cast<BoundColumnRefExpression *>(matched_cond->right.get())->binding;
+							rai_index_info->passing_table = matched_cond_right.table_index;
+							rai_index_info->cardinality = matched_cond_right.table->storage->info->cardinality;
+							rai_index_info->extended_vertex_passing = true;
+						}
+					} else {
+						rai_index_info->passing_table = right_binding.table_index;
+						rai_index_info->cardinality = right_table->storage->info->cardinality;
+					}
+					break;
+				}
+			}
+			is_left_edge = true;
+		}
+		// RIGHT is the edge
+		if (rai_index_info == nullptr && !right_table->correlated_edges.empty()) {
+			for (auto &edge : right_table->correlated_edges) {
+				bool is_self_join = false;
+				if (left_table == edge->edge_table && (left_table == edge->vertices[0]->base_table)) {
+					assert(left_table == edge->vertices[1]->base_table);
+					is_self_join = true;
+				}
+				if (right_binding.column_ordinal == edge->reference_column_ids[0] &&
+				    left_table == edge->vertices[0]->base_table &&
+				    left_binding.column_ordinal == edge->vertices[0]->base_table->primary_key_column) {
+					rai_index_info = make_unique<RelAdjIndexInfo>(
+					    edge->rai_index, is_self_join ? RAILRInfo::SELF : RAILRInfo::SOURCE_EDGE, false, left_table);
+					rai_index_info->passing_table = left_binding.table_index;
+					rai_index_info->cardinality = left_table->storage->info->cardinality;
+					break;
+				} else if (right_binding.column_ordinal == edge->reference_column_ids[1] &&
+				           left_table == edge->vertices[1]->base_table &&
+				           left_binding.column_ordinal == edge->vertices[1]->base_table->primary_key_column) {
+					rai_index_info = make_unique<RelAdjIndexInfo>(
+					    edge->rai_index, is_self_join ? RAILRInfo::SELF : RAILRInfo::DEST_EDGE, true, left_table);
+					rai_index_info->passing_table = left_binding.table_index;
+					rai_index_info->cardinality = left_table->storage->info->cardinality;
+					break;
+				}
+			}
+		}
+	}
+	if (rai_index_info) {
+		cond.rai_info = move(rai_index_info);
+		auto edge_table_index = is_left_edge ? left_binding.table_index : right_binding.table_index;
+		matched_edges[edge_table_index] = &cond;
+	}
+}
+
 pair<JoinRelationSet *, unique_ptr<LogicalOperator>>
 JoinOrderOptimizer::GenerateJoins(vector<unique_ptr<LogicalOperator>> &extracted_relations, JoinNode *node) {
 	JoinRelationSet *left_node = nullptr, *right_node = nullptr;
@@ -555,7 +673,7 @@ JoinOrderOptimizer::GenerateJoins(vector<unique_ptr<LogicalOperator>> &extracted
 		auto left = GenerateJoins(extracted_relations, node->left);
 		auto right = GenerateJoins(extracted_relations, node->right);
 
-		if (node->info->filters.size() == 0) {
+		if (node->info->filters.empty()) {
 			// no filters, create a cross product
 			auto join = make_unique<LogicalCrossProduct>();
 			join->children.push_back(move(left.second));
@@ -580,7 +698,7 @@ JoinOrderOptimizer::GenerateJoins(vector<unique_ptr<LogicalOperator>> &extracted
 				assert(condition->GetExpressionClass() == ExpressionClass::BOUND_COMPARISON);
 				auto &comparison = (BoundComparisonExpression &)*condition;
 				// we need to figure out which side is which by looking at the relations available to us
-				bool invert = JoinRelationSet::IsSubset(left.first, f->left_set) ? false : true;
+				bool invert = !JoinRelationSet::IsSubset(left.first, f->left_set);
 				cond.left = !invert ? move(comparison.left) : move(comparison.right);
 				cond.right = !invert ? move(comparison.right) : move(comparison.left);
 				cond.comparison = condition->type;
@@ -588,10 +706,15 @@ JoinOrderOptimizer::GenerateJoins(vector<unique_ptr<LogicalOperator>> &extracted
 					// reverse comparison expression if we reverse the order of the children
 					cond.comparison = FlipComparisionExpression(cond.comparison);
 				}
+				if (cond.comparison == ExpressionType::COMPARE_EQUAL &&
+				    cond.left->type == ExpressionType::BOUND_COLUMN_REF &&
+				    cond.right->type == ExpressionType::BOUND_COLUMN_REF) {
+					TryMatchEdge(join.get(), cond);
+				}
 				join->conditions.push_back(move(cond));
-				join->op_mark = node->op_mark;
+				join->op_hint = node->op_hint;
 			}
-			assert(join->conditions.size() > 0);
+			assert(!join->conditions.empty());
 			result_operator = move(join);
 		}
 		left_node = left.first;
@@ -727,15 +850,15 @@ unique_ptr<JoinOrderNode> JoinOrderOptimizer::ParseJONode(json &jo) {
 	string type = jo["type"];
 	auto children = jo["children"];
 	if (type == "HJ") {
-		node->op_mark = OpMark::HASH_JOIN;
+		node->op_hint = OpHint::HJ;
 	} else if (type == "RJ") {
-		node->op_mark = OpMark::SIP_JOIN;
+		node->op_hint = OpHint::SJ;
 	} else if (type == "NLJ") {
-		node->op_mark = OpMark::NLJ;
+		node->op_hint = OpHint::NLJ;
 	} else if (type == "JOIN") {
-		node->op_mark = OpMark::JOIN;
+		node->op_hint = OpHint::JOIN;
 	} else if (type == "SCAN") {
-		node->op_mark = OpMark::SCAN;
+		node->op_hint = OpHint::SCAN;
 		if (jo.find("rid") != jo.end()) {
 			string rid = jo["rid"];
 			node->relation_id = stoi(rid);
@@ -744,7 +867,7 @@ unique_ptr<JoinOrderNode> JoinOrderOptimizer::ParseJONode(json &jo) {
 			node->relation_id = relation_alias_mapping[relation_name];
 		}
 	} else {
-		node->op_mark = OpMark::NO_OP;
+		node->op_hint = OpHint::NO_OP;
 	}
 	for (auto &i : children) {
 		auto child = ParseJONode(i);
@@ -758,7 +881,7 @@ unique_ptr<JoinOrderNode> JoinOrderOptimizer::ParseJONode(json &jo) {
 // https://db.in.tum.de/teaching/ws1415/queryopt/chapter3.pdf?lang=de
 // FIXME: incorporate cardinality estimation into the plans, possibly by pushing samples?
 unique_ptr<LogicalOperator> JoinOrderOptimizer::Optimize(unique_ptr<LogicalOperator> plan) {
-	assert(filters.size() == 0 && relations.size() == 0); // assert that the JoinOrderOptimizer has not been used before
+	assert(filters.empty() && relations.empty()); // assert that the JoinOrderOptimizer has not been used before
 	LogicalOperator *op = plan.get();
 	// now we optimize the current plan
 	// we skip past until we find the first projection, we do this because the HAVING clause inserts a Filter AFTER
@@ -776,11 +899,11 @@ unique_ptr<LogicalOperator> JoinOrderOptimizer::Optimize(unique_ptr<LogicalOpera
 	// now that we know we are going to perform join ordering we actually extract the filters, eliminating duplicate
 	// filters in the process
 	expression_set_t filter_set;
-	for (auto &op : filter_operators) {
-		if (op->type == LogicalOperatorType::COMPARISON_JOIN) {
-			auto &join = (LogicalComparisonJoin &)*op;
+	for (auto &filter_op : filter_operators) {
+		if (filter_op->type == LogicalOperatorType::COMPARISON_JOIN) {
+			auto &join = (LogicalComparisonJoin &)*filter_op;
 			assert(join.join_type == JoinType::INNER);
-			assert(join.expressions.size() == 0);
+			assert(join.expressions.empty());
 			for (auto &cond : join.conditions) {
 				auto comparison =
 				    make_unique<BoundComparisonExpression>(cond.comparison, move(cond.left), move(cond.right));
@@ -791,13 +914,13 @@ unique_ptr<LogicalOperator> JoinOrderOptimizer::Optimize(unique_ptr<LogicalOpera
 			}
 			join.conditions.clear();
 		} else {
-			for (idx_t i = 0; i < op->expressions.size(); i++) {
-				if (filter_set.find(op->expressions[i].get()) == filter_set.end()) {
-					filter_set.insert(op->expressions[i].get());
-					filters.push_back(move(op->expressions[i]));
+			for (idx_t i = 0; i < filter_op->expressions.size(); i++) {
+				if (filter_set.find(filter_op->expressions[i].get()) == filter_set.end()) {
+					filter_set.insert(filter_op->expressions[i].get());
+					filters.push_back(move(filter_op->expressions[i]));
 				}
 			}
-			op->expressions.clear();
+			filter_op->expressions.clear();
 		}
 	}
 	// create potential edges from the comparisons
@@ -805,7 +928,6 @@ unique_ptr<LogicalOperator> JoinOrderOptimizer::Optimize(unique_ptr<LogicalOpera
 		auto &filter = filters[i];
 		auto info = make_unique<FilterInfo>();
 		auto filter_info = info.get();
-		bool has_equality = false;
 		filter_infos.push_back(move(info));
 		// first extract the relation set for the entire filter
 		unordered_set<idx_t> bindings;
@@ -819,7 +941,7 @@ unique_ptr<LogicalOperator> JoinOrderOptimizer::Optimize(unique_ptr<LogicalOpera
 			unordered_set<idx_t> left_bindings, right_bindings;
 			ExtractBindings(*comparison->left, left_bindings);
 			ExtractBindings(*comparison->right, right_bindings);
-			if (left_bindings.size() > 0 && right_bindings.size() > 0) {
+			if (!left_bindings.empty() && !right_bindings.empty()) {
 				// both the left and the right side have bindings
 				// first create the relation sets, if they do not exist
 				filter_info->left_set = set_manager.GetJoinRelation(left_bindings);
@@ -829,10 +951,8 @@ unique_ptr<LogicalOperator> JoinOrderOptimizer::Optimize(unique_ptr<LogicalOpera
 					// check if the sets are disjoint
 					if (Disjoint(left_bindings, right_bindings)) {
 						// they are disjoint, we only need to create one set of edges in the join graph
-						query_graph.CreateEdge(filter_info->left_set, filter_info->right_set, filter_info,
-						                       has_equality);
-						query_graph.CreateEdge(filter_info->right_set, filter_info->left_set, filter_info,
-						                       has_equality);
+						query_graph.CreateEdge(filter_info->left_set, filter_info->right_set, filter_info);
+						query_graph.CreateEdge(filter_info->right_set, filter_info->left_set, filter_info);
 					} else {
 						continue;
 						// the sets are not disjoint, we create two sets of edges

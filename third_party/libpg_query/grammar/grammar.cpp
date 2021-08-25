@@ -89,11 +89,12 @@ makeColumnRef(char *colname, PGList *indirection,
 }
 
 static PGNode *
-makeTypeCast(PGNode *arg, PGTypeName *tpname, int location)
+makeTypeCast(PGNode *arg, PGTypeName *tpname, int trycast, int location)
 {
 	PGTypeCast *n = makeNode(PGTypeCast);
 	n->arg = arg;
 	n->typeName = tpname;
+	n->tryCast = trycast;
 	n->location = location;
 	return (PGNode *) n;
 }
@@ -115,7 +116,66 @@ makeStringConstCast(char *str, int location, PGTypeName *tpname)
 {
 	PGNode *s = makeStringConst(str, location);
 
-	return makeTypeCast(s, tpname, -1);
+	return makeTypeCast(s, tpname, 0, -1);
+}
+
+static PGNode *
+makeIntervalNode(char *str, int location, PGList *typmods) {
+	PGIntervalConstant *n = makeNode(PGIntervalConstant);
+
+	n->val_type = T_PGString;
+	n->sval = str;
+	n->location = location;
+	n->typmods = typmods;
+
+	return (PGNode *)n;
+
+}
+
+static PGNode *
+makeIntervalNode(int val, int location, PGList *typmods) {
+	PGIntervalConstant *n = makeNode(PGIntervalConstant);
+
+	n->val_type = T_PGInteger;
+	n->ival = val;
+	n->location = location;
+	n->typmods = typmods;
+
+	return (PGNode *)n;
+}
+
+static PGNode *
+makeIntervalNode(PGNode *arg, int location, PGList *typmods) {
+	PGIntervalConstant *n = makeNode(PGIntervalConstant);
+
+	n->val_type = T_PGAExpr;
+	n->eval = arg;
+	n->location = location;
+	n->typmods = typmods;
+
+	return (PGNode *)n;
+}
+
+static PGNode *
+makeSampleSize(PGValue *sample_size, bool is_percentage) {
+	PGSampleSize *n = makeNode(PGSampleSize);
+
+	n->sample_size = *sample_size;
+	n->is_percentage = is_percentage;
+
+	return (PGNode *)n;
+}
+
+static PGNode *
+makeSampleOptions(PGNode *sample_size, char *method, int seed, int location) {
+	PGSampleOptions *n = makeNode(PGSampleOptions);
+
+	n->sample_size = sample_size;
+	n->method = method;
+	n->seed = seed;
+	n->location = location;
+
+	return (PGNode *)n;
 }
 
 static PGNode *
@@ -201,7 +261,7 @@ makeBoolAConst(bool state, int location)
 	n->val.val.str = (state ? (char*) "t" : (char*) "f");
 	n->location = location;
 
-	return makeTypeCast((PGNode *)n, SystemTypeName("bool"), -1);
+	return makeTypeCast((PGNode *)n, SystemTypeName("bool"), 0, -1);
 }
 
 /* check_qualified_name --- check the result of qualified_name production
@@ -271,12 +331,6 @@ static PGNode* makeParamRef(int number, int location)
 	return (PGNode *) p;
 }
 
-static PGNode *
-makeParamRefCast(int number, int location, PGTypeName *tpname)
-{
-	PGNode *p = makeParamRef(number, location);
-	return makeTypeCast(p, tpname, -1);
-}
 
 /* insertSelectOptions()
  * Insert ORDER BY, etc into an already-constructed SelectStmt.
@@ -667,3 +721,14 @@ parser_init(base_yy_extra_type *yyext)
 {
 	yyext->parsetree = NIL;		/* in case grammar forgets to set it */
 }
+
+#undef yyparse
+#undef yylex
+#undef yyerror
+#undef yylval
+#undef yychar
+#undef yydebug
+#undef yynerrs
+#undef yylloc
+
+} // namespace duckdb_libpgquery

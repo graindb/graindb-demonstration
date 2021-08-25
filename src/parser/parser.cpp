@@ -1,15 +1,14 @@
 #include "duckdb/parser/parser.hpp"
 
-#include "duckdb/parser/transformer.hpp"
 #include "duckdb/parser/parsed_data/create_table_info.hpp"
+#include "duckdb/parser/query_node/select_node.hpp"
 #include "duckdb/parser/statement/create_statement.hpp"
 #include "duckdb/parser/statement/select_statement.hpp"
 #include "duckdb/parser/statement/update_statement.hpp"
-#include "duckdb/parser/query_node/select_node.hpp"
 #include "duckdb/parser/tableref/expressionlistref.hpp"
-#include "postgres_parser.hpp"
-
+#include "duckdb/parser/transformer.hpp"
 #include "parser/parser.hpp"
+#include "postgres_parser.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -36,7 +35,7 @@ void Parser::ParseQuery(string query) {
 	transformer.TransformParseTree(parser.parse_tree, statements);
 	n_prepared_parameters = transformer.ParamCount();
 
-	if (statements.size() > 0) {
+	if (!statements.empty()) {
 		auto &last_statement = statements.back();
 		last_statement->stmt_length = query.size() - last_statement->stmt_location;
 	}

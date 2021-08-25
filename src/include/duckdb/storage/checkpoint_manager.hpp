@@ -10,8 +10,8 @@
 
 #include "duckdb/common/common.hpp"
 #include "duckdb/common/types/chunk_collection.hpp"
-#include "duckdb/storage/storage_manager.hpp"
 #include "duckdb/storage/meta_block_writer.hpp"
+#include "duckdb/storage/storage_manager.hpp"
 
 namespace duckdb {
 class ClientContext;
@@ -39,7 +39,7 @@ public:
 //! CheckpointManager is responsible for checkpointing the database
 class CheckpointManager {
 public:
-	CheckpointManager(StorageManager &manager);
+	explicit CheckpointManager(StorageManager &manager);
 
 	//! Checkpoint the current state of the WAL and flush it to the main storage. This should be called BEFORE any
 	//! connction is available because right now the checkpointing cannot be done online. (TODO)
@@ -61,13 +61,15 @@ public:
 private:
 	void WriteSchema(Transaction &transaction, SchemaCatalogEntry &schema);
 	void WriteTable(Transaction &transaction, TableCatalogEntry &table);
-	void WriteView(ViewCatalogEntry &table);
-	void WriteSequence(SequenceCatalogEntry &table);
+	void WriteEdge(Transaction &transaction, EdgeCatalogEntry &edge) const;
+	void WriteView(ViewCatalogEntry &table) const;
+	void WriteSequence(SequenceCatalogEntry &table) const;
 
 	void ReadSchema(ClientContext &context, MetaBlockReader &reader);
 	void ReadTable(ClientContext &context, MetaBlockReader &reader);
-	void ReadView(ClientContext &context, MetaBlockReader &reader);
-	void ReadSequence(ClientContext &context, MetaBlockReader &reader);
+	void ReadEdge(ClientContext &context, MetaBlockReader &reader) const;
+	void ReadView(ClientContext &context, MetaBlockReader &reader) const;
+	void ReadSequence(ClientContext &context, MetaBlockReader &reader) const;
 };
 
 } // namespace duckdb

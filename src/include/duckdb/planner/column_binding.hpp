@@ -10,7 +10,6 @@
 
 #include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
 #include "duckdb/common/common.hpp"
-#include "duckdb/storage/rai.hpp"
 
 using std::hash;
 
@@ -45,6 +44,11 @@ struct ColumnBinding {
 
 	bool Match(TableCatalogEntry *table_, idx_t column_ordinal_) const {
 		return table_->name == table->name && column_ordinal_ == column_ordinal;
+	}
+
+	ColumnBinding Copy() const {
+		ColumnBinding result(table_index, column_index, column_ordinal, table);
+		return result;
 	}
 };
 

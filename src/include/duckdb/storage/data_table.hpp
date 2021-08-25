@@ -14,7 +14,6 @@
 #include "duckdb/storage/block.hpp"
 #include "duckdb/storage/column_data.hpp"
 #include "duckdb/storage/index.hpp"
-#include "duckdb/storage/rai.hpp"
 #include "duckdb/storage/table/column_segment.hpp"
 #include "duckdb/storage/table/persistent_segment.hpp"
 #include "duckdb/storage/table/version_manager.hpp"
@@ -39,7 +38,7 @@ typedef unique_ptr<vector<unique_ptr<PersistentSegment>>[]> persistent_data_t;
 class TableFilter {
 public:
 	TableFilter(Value constant, ExpressionType comparison_type, idx_t column_index)
-	    : constant(constant), comparison_type(comparison_type), column_index(column_index){};
+	    : constant(move(constant)), comparison_type(comparison_type), column_index(column_index){};
 	Value constant;
 	ExpressionType comparison_type;
 	idx_t column_index;
@@ -58,13 +57,8 @@ struct DataTableInfo {
 	string table;
 	//! Indexes associated with the current table
 	vector<unique_ptr<Index>> indexes;
-	//! Edges
-	vector<unique_ptr<RAI>> rais;
-	//! A collection of estimated cardinalities over table columns using HyperLogLog
-	vector<unique_ptr<HyperLogLog>> column_card_objs;
-	vector<idx_t> column_cards;
 
-	bool IsTemporary() {
+	bool IsTemporary() const {
 		return schema == TEMP_SCHEMA;
 	}
 };
@@ -79,7 +73,7 @@ public:
 	//! Constructs a DataTable as a delta on an existing data table but with one column removed
 	DataTable(ClientContext &context, DataTable &parent, idx_t removed_column);
 	//! Constructs a DataTable as a delta on an existing data table but with one column changed type
-	DataTable(ClientContext &context, DataTable &parent, idx_t changed_idx, SQLType target_type,
+	DataTable(ClientContext &context, DataTable &parent, idx_t changed_idx, const SQLType &target_type,
 	          vector<column_t> bound_columns, Expression &cast_expr);
 
 	shared_ptr<DataTableInfo> info;
@@ -91,7 +85,7 @@ public:
 public:
 	void InitializeScan(TableScanState &state, vector<column_t> column_ids,
 	                    unordered_map<idx_t, vector<TableFilter>> *table_filter = nullptr);
-	void InitializeScan(TableScanState &state, vector<column_t> column_ids, const shared_ptr<rows_vector> &rowids,
+	void InitializeScan(TableScanState &state, vector<column_t> column_ids, const shared_ptr<vector<row_t>> &rowids,
 	                    idx_t rows_count, unordered_map<idx_t, vector<TableFilter>> *table_filter = nullptr);
 	void InitializeScan(TableScanState &state, vector<column_t> column_ids, const shared_ptr<bitmask_vector> &zones,
 	                    const shared_ptr<bitmask_vector> &zones_sel,
@@ -130,12 +124,9 @@ public:
 	//! Add an index to the DataTable
 	void AddIndex(unique_ptr<Index> index, vector<unique_ptr<Expression>> &expressions);
 	//! Add an RAI to the DataTable
-	void AddRAI(unique_ptr<RAI> rai) const;
+	//	void AddRAI(unique_ptr<RAI> rai) const;
 	//! Replace adjacency column data
-	void AppendRAIColumn(column_t oid);
-
-	//! Update column cards from scratch
-	void UpdateColumnCards(Transaction &transaction);
+	void AppendJoinIndexColumn(column_t oid);
 
 	//! Begin appending structs to this table, obtaining necessary locks, etc
 	void InitializeAppend(TableAppendState &state);
@@ -158,8 +149,6 @@ public:
 	void SetAsRoot() {
 		this->is_root = true;
 	}
-	//! return the edge description of the table
-	string GetRAIsInfo() const;
 
 	shared_ptr<ColumnData> GetColumn(column_t col) {
 		return columns[col];
@@ -174,8 +163,8 @@ private:
 	void InitializeIndexScan(Transaction &transaction, TableIndexScanState &state, Index &index,
 	                         vector<column_t> column_ids);
 
-	bool CheckZonemap(TableScanState &state, unordered_map<idx_t, vector<TableFilter>> &table_filters,
-	                  idx_t &current_row, SelectionVector &valid_sel, idx_t &max_count);
+	static bool CheckZonemap(TableScanState &state, unordered_map<idx_t, vector<TableFilter>> &table_filters,
+	                         idx_t &current_row, SelectionVector &valid_sel, idx_t &max_count);
 	bool ScanBaseTable(Transaction &transaction, DataChunk &result, TableScanState &state, idx_t &current_row,
 	                   idx_t max_row, idx_t base_row, VersionManager &manager,
 	                   unordered_map<idx_t, vector<TableFilter>> &table_filters);
@@ -190,8 +179,8 @@ private:
 	idx_t FetchRows(Transaction &transaction, Vector &row_identifiers, idx_t fetch_count, row_t result_rows[]);
 	//! Perform lookup
 	template <class T>
-	void inline LookupRows(shared_ptr<ColumnData> column, const shared_ptr<vector<row_t>> &rowids, Vector &result,
-	                       idx_t offset, idx_t count, idx_t type_size = sizeof(T));
+	void inline LookupRows(const shared_ptr<ColumnData> &column, const shared_ptr<vector<row_t>> &rowids,
+	                       Vector &result, idx_t offset, idx_t count, idx_t type_size = sizeof(T));
 
 	//! The CreateIndexScan is a special scan that is used to create an index on the table, it keeps locks on the table
 	void InitializeCreateIndexScan(CreateIndexScanState &state, vector<column_t> column_ids);

@@ -35,29 +35,6 @@ TEST_CASE("Test TPC-H SF0.01", "[tpch]") {
 	}
 }
 
-TEST_CASE("Test TPC-H SF0.1 with rai", "[tpch]") {
-	unique_ptr<QueryResult> result;
-	double sf = 0.1;
-
-	// generate the TPC-H data for SF 0.1
-	DuckDB db(nullptr);
-	Connection con(db);
-	tpch::dbgen(sf, db);
-
-	result =
-	    con.Query("CREATE RAI order_part ON lineitem (FROM l_orderkey REFERENCES orders.o_orderkey, TO l_partkey "
-	              "REFERENCES part.p_partkey); CREATE RAI order_supp ON lineitem (FROM l_orderkey REFERENCES "
-	              "orders.o_orderkey, TO l_suppkey REFERENCES supplier.s_suppkey);CREATE RAI supp_part ON partsupp "
-	              "(FROM ps_suppkey REFERENCES supplier.s_suppkey, TO ps_partkey REFERENCES part.p_partkey);");
-
-	// test all the basic queries
-	idx_t queries[10] = {2, 8, 9, 11, 14, 16, 17, 19, 20, 21};
-	for (idx_t i : queries) {
-		result = con.Query(tpch::get_query(i));
-		COMPARE_CSV(result, tpch::get_answer(sf, i), true);
-	}
-}
-
 TEST_CASE("Test TPC-H SF0.1", "[tpch][.]") {
 	unique_ptr<QueryResult> result;
 	double sf = 0.1;

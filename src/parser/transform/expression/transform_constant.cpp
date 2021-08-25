@@ -5,15 +5,15 @@
 using namespace duckdb;
 using namespace std;
 
-unique_ptr<ParsedExpression> Transformer::TransformValue(PGValue val) {
+unique_ptr<ParsedExpression> Transformer::TransformValue(duckdb_libpgquery::PGValue val) {
 	switch (val.type) {
-	case T_PGInteger:
+	case duckdb_libpgquery::T_PGInteger:
 		assert(val.val.ival <= numeric_limits<int32_t>::max());
 		return make_unique<ConstantExpression>(SQLType::INTEGER, Value::INTEGER((int32_t)val.val.ival));
-	case T_PGBitString: // FIXME: this should actually convert to BLOB
-	case T_PGString:
+	case duckdb_libpgquery::T_PGBitString: // FIXME: this should actually convert to BLOB
+	case duckdb_libpgquery::T_PGString:
 		return make_unique<ConstantExpression>(SQLType::VARCHAR, Value(string(val.val.str)));
-	case T_PGFloat: {
+	case duckdb_libpgquery::T_PGFloat: {
 		bool cast_as_double = false;
 		for (auto ptr = val.val.str; *ptr; ptr++) {
 			if (*ptr == '.') {
@@ -35,13 +35,13 @@ unique_ptr<ParsedExpression> Transformer::TransformValue(PGValue val) {
 			return make_unique<ConstantExpression>(SQLType::DOUBLE, Value::DOUBLE(dbl_value));
 		}
 	}
-	case T_PGNull:
+	case duckdb_libpgquery::T_PGNull:
 		return make_unique<ConstantExpression>(SQLType::SQLNULL, Value());
 	default:
 		throw NotImplementedException("Value not implemented!");
 	}
 }
 
-unique_ptr<ParsedExpression> Transformer::TransformConstant(PGAConst *c) {
+unique_ptr<ParsedExpression> Transformer::TransformConstant(duckdb_libpgquery::PGAConst *c) {
 	return TransformValue(c->val);
 }

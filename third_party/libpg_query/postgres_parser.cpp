@@ -2,16 +2,17 @@
 
 #include "pg_functions.hpp"
 #include "parser/parser.hpp"
+#include "common/keywords.hpp"
 
-using namespace duckdb;
 using namespace std;
 
-PostgresParser::PostgresParser() : success(false), parse_tree(nullptr), error_message(""), error_location(0) {};
+namespace duckdb {
 
+PostgresParser::PostgresParser() : success(false), parse_tree(nullptr), error_message(""), error_location(0) {}
 
-void PostgresParser::Parse(string query) {
-	pg_parser_init();
-	parse_result res;
+void PostgresParser::Parse(const string &query) {
+	duckdb_libpgquery::pg_parser_init();
+    duckdb_libpgquery::parse_result res;
 	pg_parser_parse(query.c_str(), &res);
 	success = res.success;
 
@@ -21,8 +22,21 @@ void PostgresParser::Parse(string query) {
 		error_message = string(res.error_message);
 		error_location = res.error_location;
 	}
-};
+}
+
+vector<duckdb_libpgquery::PGSimplifiedToken> PostgresParser::Tokenize(const std::string &query) {
+	duckdb_libpgquery::pg_parser_init();
+	auto tokens = duckdb_libpgquery::tokenize(query.c_str());
+	duckdb_libpgquery::pg_parser_cleanup();
+	return tokens;
+}
 
 PostgresParser::~PostgresParser()  {
-	pg_parser_cleanup();
-};
+    duckdb_libpgquery::pg_parser_cleanup();
+}
+
+bool PostgresParser::IsKeyword(const std::string &text) {
+	return duckdb_libpgquery::is_keyword(text.c_str());
+}
+
+}

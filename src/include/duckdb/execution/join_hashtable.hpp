@@ -50,7 +50,7 @@ public:
 		JoinHashTable &ht;
 		bool finished;
 
-		ScanStructure(JoinHashTable &ht);
+		explicit ScanStructure(JoinHashTable &ht);
 		//! Get the next batch of data from the scan structure
 		void Next(DataChunk &keys, DataChunk &left, DataChunk &result);
 
@@ -107,9 +107,9 @@ private:
 	};
 
 	idx_t AppendToBlock(HTDataBlock &block, BufferHandle &handle, vector<BlockAppendEntry> &append_entries,
-	                    idx_t remaining);
+	                    idx_t remaining) const;
 
-	void Hash(DataChunk &keys, const SelectionVector &sel, idx_t count, Vector &hashes);
+	void Hash(DataChunk &keys, const SelectionVector &sel, idx_t count, Vector &hashes) const;
 
 public:
 	JoinHashTable(BufferManager &buffer_manager, vector<JoinCondition> &conditions, vector<TypeId> build_types,
@@ -127,7 +127,7 @@ public:
 	//! Copying not allowed
 	JoinHashTable(const JoinHashTable &) = delete;
 
-	idx_t size() {
+	idx_t size() const {
 		return count;
 	}
 
@@ -187,12 +187,12 @@ public:
 	} correlated_mark_join_info;
 
 private:
-	void BuildSingle(DataChunk &keys, DataChunk &input);
-	void FinalizeSingle();
-	unique_ptr<ScanStructure> ProbeSingle(DataChunk &keys);
+	// void BuildSingle(DataChunk &keys, DataChunk &input);
+	// void FinalizeSingle();
+	// unique_ptr<ScanStructure> ProbeSingle(DataChunk &keys);
 
 	//! Apply a bitmask to the hashes
-	void ApplyBitmask(Vector &hashes, idx_t count);
+	void ApplyBitmask(Vector &hashes, idx_t count) const;
 	void ApplyBitmask(Vector &hashes, const SelectionVector &sel, idx_t count, Vector &pointers);
 	//! Insert the given set of locations into the HT with the given set of
 	//! hashes. Caller should hold lock in parallel HT.

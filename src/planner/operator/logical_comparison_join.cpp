@@ -11,25 +11,25 @@ LogicalComparisonJoin::LogicalComparisonJoin(JoinType join_type, LogicalOperator
 
 string LogicalComparisonJoin::ParamsToString() const {
 	string result = "[" + JoinTypeToString(join_type);
-	if (conditions.size() > 0) {
+	if (!conditions.empty()) {
 		result += " ";
 		result += StringUtil::Join(conditions, conditions.size(), ", ", [](const JoinCondition &condition) {
 			return ExpressionTypeToString(condition.comparison) + "(" + condition.left->GetName() + ", " +
 			       condition.right->GetName() + ")";
 		});
 		result += ", ";
-		switch (op_mark) {
-		case OpMark::HASH_JOIN:
+		switch (op_hint) {
+		case OpHint::HJ:
 			result += "HASH JOIN";
 			break;
-		case OpMark::SIP_JOIN:
-			result += "RAI JOIN";
+		case OpHint::SJ:
+			result += "SIP JOIN";
 			break;
-		case OpMark::NLJ:
+		case OpHint::NLJ:
 			result += "NEST LOOP JOIN";
 			break;
-		case OpMark::MERGED_SIP_JOIN:
-			result += "MERGED_RAI_JOIN";
+		case OpHint::MSJ:
+			result += "MERGE SIP JOIN";
 			break;
 		default:
 			result += "DEFAULT JOIN";

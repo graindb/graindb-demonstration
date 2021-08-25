@@ -15,11 +15,11 @@ namespace duckdb {
 //! Represents a subquery
 class SubqueryRef : public TableRef {
 public:
-	SubqueryRef(unique_ptr<QueryNode> subquery, string alias = string());
+	explicit SubqueryRef(unique_ptr<QueryNode> subquery, string alias = string());
 
 	//! The subquery
 	unique_ptr<QueryNode> subquery;
-	//! Alises for the column names
+	//! Aliases for the column names
 	vector<string> column_name_alias;
 
 public:

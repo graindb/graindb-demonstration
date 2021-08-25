@@ -2,7 +2,6 @@
 
 namespace duckdb {
 
-nullmask_t ZERO_MASK = nullmask_t(0);
 const SelectionVector ConstantVector::ZeroSelectionVector = SelectionVector((sel_t *)ConstantVector::zero_vector);
 const SelectionVector FlatVector::IncrementalSelectionVector = SelectionVector((sel_t *)FlatVector::incremental_vector);
 const sel_t ConstantVector::zero_vector[STANDARD_VECTOR_SIZE] = {0};

@@ -8,19 +8,19 @@
 
 #pragma once
 
+#include "duckdb/catalog/catalog_entry/prepared_statement_catalog_entry.hpp"
 #include "duckdb/parser/sql_statement.hpp"
 #include "duckdb/planner/binder.hpp"
 #include "duckdb/planner/logical_operator.hpp"
-#include "duckdb/catalog/catalog_entry/prepared_statement_catalog_entry.hpp"
 
 namespace duckdb {
 class ClientContext;
 
 //! The planner creates a logical query plan from the parsed SQL statements
-//! using the Binder and LogicalPlanGenerator.
+//! using the Binder.
 class Planner {
 public:
-	Planner(ClientContext &context);
+	explicit Planner(ClientContext &context);
 
 	void CreatePlan(unique_ptr<SQLStatement> statement);
 
@@ -37,11 +37,5 @@ public:
 
 private:
 	void CreatePlan(SQLStatement &statement);
-
-	// void VerifyQuery(BoundSQLStatement &statement);
-	// void VerifyNode(BoundQueryNode &statement);
-	// void VerifyExpression(Expression &expr, vector<unique_ptr<Expression>> &copies);
-
-	// bool StatementRequiresValidTransaction(BoundSQLStatement &statement);
 };
 } // namespace duckdb

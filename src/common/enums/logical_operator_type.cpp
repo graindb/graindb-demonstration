@@ -71,8 +71,8 @@ string LogicalOperatorToString(LogicalOperatorType type) {
 		return "CREATE_INDEX";
 	case LogicalOperatorType::CREATE_TABLE:
 		return "CREATE_TABLE";
-	case LogicalOperatorType::CREATE_RAI:
-		return "CREATE_RAI";
+	case LogicalOperatorType::CREATE_EDGE:
+		return "CREATE_EDGE";
 	case LogicalOperatorType::EXPLAIN:
 		return "EXPLAIN";
 	case LogicalOperatorType::EXECUTE:

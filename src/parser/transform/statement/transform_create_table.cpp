@@ -7,14 +7,14 @@
 using namespace duckdb;
 using namespace std;
 
-string Transformer::TransformCollation(PGCollateClause *collate) {
+string Transformer::TransformCollation(duckdb_libpgquery::PGCollateClause *collate) {
 	if (!collate) {
 		return string();
 	}
 	string collation;
 	for (auto c = collate->collname->head; c != NULL; c = lnext(c)) {
-		auto pgvalue = (PGValue *)c->data.ptr_value;
-		if (pgvalue->type != T_PGString) {
+		auto pgvalue = (duckdb_libpgquery::PGValue *)c->data.ptr_value;
+		if (pgvalue->type != duckdb_libpgquery::T_PGString) {
 			throw ParserException("Expected a string as collation type!");
 		}
 		auto collation_argument = string(pgvalue->val.str);
@@ -27,21 +27,21 @@ string Transformer::TransformCollation(PGCollateClause *collate) {
 	return collation;
 }
 
-unique_ptr<ParsedExpression> Transformer::TransformCollateExpr(PGCollateClause *collate) {
+unique_ptr<ParsedExpression> Transformer::TransformCollateExpr(duckdb_libpgquery::PGCollateClause *collate) {
 	auto child = TransformExpression(collate->arg);
 	auto collation = TransformCollation(collate);
 	return make_unique<CollateExpression>(collation, move(child));
 }
 
-ColumnDefinition Transformer::TransformColumnDefinition(PGColumnDef *cdef) {
+ColumnDefinition Transformer::TransformColumnDefinition(duckdb_libpgquery::PGColumnDef *cdef) {
 	SQLType target_type = TransformTypeName(cdef->typeName);
 	target_type.collation = TransformCollation(cdef->collClause);
 
 	return ColumnDefinition(cdef->colname, target_type);
 }
 
-unique_ptr<CreateStatement> Transformer::TransformCreateTable(PGNode *node) {
-	auto stmt = reinterpret_cast<PGCreateStmt *>(node);
+unique_ptr<CreateStatement> Transformer::TransformCreateTable(duckdb_libpgquery::PGNode *node) {
+	auto stmt = reinterpret_cast<duckdb_libpgquery::PGCreateStmt *>(node);
 	assert(stmt);
 	auto result = make_unique<CreateStatement>();
 	auto info = make_unique<CreateTableInfo>();
@@ -57,10 +57,10 @@ unique_ptr<CreateStatement> Transformer::TransformCreateTable(PGNode *node) {
 	}
 	info->table = stmt->relation->relname;
 	info->on_conflict = stmt->if_not_exists ? OnCreateConflict::IGNORE : OnCreateConflict::ERROR;
-	info->temporary = stmt->relation->relpersistence == PGPostgresRelPersistence::PG_RELPERSISTENCE_TEMP;
+	info->temporary = stmt->relation->relpersistence == duckdb_libpgquery::PGPostgresRelPersistence::PG_RELPERSISTENCE_TEMP;
 
-	if (info->temporary && stmt->oncommit != PGOnCommitAction::PG_ONCOMMIT_PRESERVE_ROWS &&
-	    stmt->oncommit != PGOnCommitAction::PG_ONCOMMIT_NOOP) {
+	if (info->temporary && stmt->oncommit != duckdb_libpgquery::PGOnCommitAction::PG_ONCOMMIT_PRESERVE_ROWS &&
+	    stmt->oncommit != duckdb_libpgquery::PGOnCommitAction::PG_ONCOMMIT_NOOP) {
 		throw NotImplementedException("Only ON COMMIT PRESERVE ROWS is supported");
 	}
 	if (!stmt->tableElts) {
@@ -68,10 +68,10 @@ unique_ptr<CreateStatement> Transformer::TransformCreateTable(PGNode *node) {
 	}
 
 	for (auto c = stmt->tableElts->head; c != NULL; c = lnext(c)) {
-		auto node = reinterpret_cast<PGNode *>(c->data.ptr_value);
+		auto node = reinterpret_cast<duckdb_libpgquery::PGNode *>(c->data.ptr_value);
 		switch (node->type) {
-		case T_PGColumnDef: {
-			auto cdef = (PGColumnDef *)c->data.ptr_value;
+		case duckdb_libpgquery::T_PGColumnDef: {
+			auto cdef = (duckdb_libpgquery::PGColumnDef *)c->data.ptr_value;
 			auto centry = TransformColumnDefinition(cdef);
 			if (cdef->constraints) {
 				for (auto constr = cdef->constraints->head; constr != nullptr; constr = constr->next) {
@@ -84,7 +84,7 @@ unique_ptr<CreateStatement> Transformer::TransformCreateTable(PGNode *node) {
 			info->columns.push_back(move(centry));
 			break;
 		}
-		case T_PGConstraint: {
+		case duckdb_libpgquery::T_PGConstraint: {
 			info->constraints.push_back(TransformConstraint(c));
 			break;
 		}

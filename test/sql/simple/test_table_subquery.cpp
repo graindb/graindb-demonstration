@@ -32,12 +32,12 @@ TEST_CASE("Table subquery", "[subquery]") {
 	// check that * is in the correct order
 	result = con.Query("SELECT * FROM (SELECT i, j FROM test) AS a, (SELECT "
 	                   "i+1 AS r,j FROM test) AS b, test WHERE a.i=b.r AND test.j=a.i ORDER BY 1;");
-	REQUIRE(CHECK_COLUMN(result, 0, {4, 5}));
-	REQUIRE(CHECK_COLUMN(result, 1, {5, 6}));
+	REQUIRE(CHECK_COLUMN(result, 0, {3, 4}));
+	REQUIRE(CHECK_COLUMN(result, 1, {4, 5}));
 	REQUIRE(CHECK_COLUMN(result, 2, {4, 5}));
 	REQUIRE(CHECK_COLUMN(result, 3, {4, 5}));
-	REQUIRE(CHECK_COLUMN(result, 4, {3, 4}));
-	REQUIRE(CHECK_COLUMN(result, 5, {4, 5}));
+	REQUIRE(CHECK_COLUMN(result, 4, {4, 5}));
+	REQUIRE(CHECK_COLUMN(result, 5, {5, 6}));
 
 	// subquery group cols are visible
 	result = con.Query("select sum(x) from (select i as x from test group by i) sq;");
@@ -60,12 +60,12 @@ TEST_CASE("Nested table subquery", "[subquery]") {
 	result = con.Query("SELECT * FROM (SELECT i, j FROM (SELECT j AS i, i AS j FROM (SELECT j "
 	                   "AS i, i AS j FROM test) AS a) AS a) AS a, (SELECT i+1 AS r,j FROM "
 	                   "test) AS b, test WHERE a.i=b.r AND test.j=a.i ORDER BY 1;");
-	REQUIRE(CHECK_COLUMN(result, 0, {4, 5}));
-	REQUIRE(CHECK_COLUMN(result, 1, {5, 6}));
+	REQUIRE(CHECK_COLUMN(result, 0, {3, 4}));
+	REQUIRE(CHECK_COLUMN(result, 1, {4, 5}));
 	REQUIRE(CHECK_COLUMN(result, 2, {4, 5}));
 	REQUIRE(CHECK_COLUMN(result, 3, {4, 5}));
-	REQUIRE(CHECK_COLUMN(result, 4, {3, 4}));
-	REQUIRE(CHECK_COLUMN(result, 5, {4, 5}));
+	REQUIRE(CHECK_COLUMN(result, 4, {4, 5}));
+	REQUIRE(CHECK_COLUMN(result, 5, {5, 6}));
 
 	const int NESTING_LEVELS = 100;
 

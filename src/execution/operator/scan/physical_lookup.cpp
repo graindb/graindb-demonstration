@@ -37,7 +37,7 @@ PhysicalLookup::PhysicalLookup(LogicalOperator &op, TableCatalogEntry &tableref,
 }
 
 template <class T>
-void inline PhysicalLookup::Lookup(ClientContext &context, ColumnData &column, row_t *row_ids, Vector &result,
+void inline PhysicalLookup::Lookup(ClientContext &context, ColumnData &column, const row_t *row_ids, Vector &result,
                                    idx_t count, unordered_map<idx_t, data_ptr_t> &segment_ptrs, idx_t type_size) {
 	auto result_data = FlatVector::GetData(result);
 	idx_t s_size = column.data.nodes[0].node->count;
@@ -87,59 +87,53 @@ void PhysicalLookup::GetChunkInternal(ClientContext &context, DataChunk &chunk, 
 			auto column = table.GetColumn(col);
 			switch (column->type) {
 			case TypeId::INT8: {
-				Lookup<int8_t>(context, *column.get(), row_ids, chunk.data[col_idx], fetch_count,
-				               segment_ptrs_map[col_idx]);
+				Lookup<int8_t>(context, *column, row_ids, chunk.data[col_idx], fetch_count, segment_ptrs_map[col_idx]);
 				break;
 			}
 			case TypeId::UINT8: {
-				Lookup<uint8_t>(context, *column.get(), row_ids, chunk.data[col_idx], fetch_count,
-				                segment_ptrs_map[col_idx]);
+				Lookup<uint8_t>(context, *column, row_ids, chunk.data[col_idx], fetch_count, segment_ptrs_map[col_idx]);
 				break;
 			}
 			case TypeId::INT16: {
-				Lookup<int16_t>(context, *column.get(), row_ids, chunk.data[col_idx], fetch_count,
-				                segment_ptrs_map[col_idx]);
+				Lookup<int16_t>(context, *column, row_ids, chunk.data[col_idx], fetch_count, segment_ptrs_map[col_idx]);
 				break;
 			}
 			case TypeId::HASH:
 			case TypeId::UINT16: {
-				Lookup<uint16_t>(context, *column.get(), row_ids, chunk.data[col_idx], fetch_count,
+				Lookup<uint16_t>(context, *column, row_ids, chunk.data[col_idx], fetch_count,
 				                 segment_ptrs_map[col_idx]);
 				break;
 			}
 			case TypeId::INT32: {
-				Lookup<int32_t>(context, *column.get(), row_ids, chunk.data[col_idx], fetch_count,
-				                segment_ptrs_map[col_idx]);
+				Lookup<int32_t>(context, *column, row_ids, chunk.data[col_idx], fetch_count, segment_ptrs_map[col_idx]);
 				break;
 			}
 			case TypeId::UINT32: {
-				Lookup<uint32_t>(context, *column.get(), row_ids, chunk.data[col_idx], fetch_count,
+				Lookup<uint32_t>(context, *column, row_ids, chunk.data[col_idx], fetch_count,
 				                 segment_ptrs_map[col_idx]);
 				break;
 			}
 			case TypeId::TIMESTAMP:
 			case TypeId::INT64: {
-				Lookup<int64_t>(context, *column.get(), row_ids, chunk.data[col_idx], fetch_count,
-				                segment_ptrs_map[col_idx]);
+				Lookup<int64_t>(context, *column, row_ids, chunk.data[col_idx], fetch_count, segment_ptrs_map[col_idx]);
 				break;
 			}
 			case TypeId::UINT64: {
-				Lookup<uint64_t>(context, *column.get(), row_ids, chunk.data[col_idx], fetch_count,
+				Lookup<uint64_t>(context, *column, row_ids, chunk.data[col_idx], fetch_count,
 				                 segment_ptrs_map[col_idx]);
 				break;
 			}
 			case TypeId::FLOAT: {
-				Lookup<float_t>(context, *column.get(), row_ids, chunk.data[col_idx], fetch_count,
-				                segment_ptrs_map[col_idx]);
+				Lookup<float_t>(context, *column, row_ids, chunk.data[col_idx], fetch_count, segment_ptrs_map[col_idx]);
 				break;
 			}
 			case TypeId::DOUBLE: {
-				Lookup<double_t>(context, *column.get(), row_ids, chunk.data[col_idx], fetch_count,
+				Lookup<double_t>(context, *column, row_ids, chunk.data[col_idx], fetch_count,
 				                 segment_ptrs_map[col_idx]);
 				break;
 			}
 			case TypeId::POINTER: {
-				Lookup<uintptr_t>(context, *column.get(), row_ids, chunk.data[col_idx], fetch_count,
+				Lookup<uintptr_t>(context, *column, row_ids, chunk.data[col_idx], fetch_count,
 				                  segment_ptrs_map[col_idx]);
 				break;
 			}
@@ -152,7 +146,7 @@ void PhysicalLookup::GetChunkInternal(ClientContext &context, DataChunk &chunk, 
 	// filter
 	SelectionVector filter_sel(fetch_count);
 	auto result_count = fetch_count;
-	if (table_filters.size() > 0) {
+	if (!table_filters.empty()) {
 		result_count = state->executor.SelectExpression(chunk, filter_sel);
 	}
 	// reference
@@ -177,7 +171,7 @@ void PhysicalLookup::GetChunkInternal(ClientContext &context, DataChunk &chunk, 
 }
 
 string PhysicalLookup::ExtraRenderInformation() const {
-	string result = "";
+	string result;
 	if (expression) {
 		result += tableref.name + " " + expression->ToString();
 	} else {
@@ -199,7 +193,7 @@ string PhysicalLookup::ExtraRenderInformation() const {
 }
 
 unique_ptr<PhysicalOperatorState> PhysicalLookup::GetOperatorState() {
-	if (table_filters.size() > 0) {
+	if (!table_filters.empty()) {
 		return make_unique<PhysicalLookupOperatorState>(*expression);
 	}
 	return make_unique<PhysicalLookupOperatorState>();

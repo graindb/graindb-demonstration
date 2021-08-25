@@ -5,14 +5,14 @@
 using namespace duckdb;
 using namespace std;
 
-unique_ptr<ParsedExpression> Transformer::TransformNullTest(PGNullTest *root) {
+unique_ptr<ParsedExpression> Transformer::TransformNullTest(duckdb_libpgquery::PGNullTest *root) {
 	assert(root);
-	auto arg = TransformExpression(reinterpret_cast<PGNode *>(root->arg));
+	auto arg = TransformExpression(reinterpret_cast<duckdb_libpgquery::PGNode *>(root->arg));
 	if (root->argisrow) {
 		throw NotImplementedException("IS NULL argisrow");
 	}
 	ExpressionType expr_type =
-	    (root->nulltesttype == PG_IS_NULL) ? ExpressionType::OPERATOR_IS_NULL : ExpressionType::OPERATOR_IS_NOT_NULL;
+	    (root->nulltesttype == duckdb_libpgquery::PG_IS_NULL) ? ExpressionType::OPERATOR_IS_NULL : ExpressionType::OPERATOR_IS_NOT_NULL;
 
 	return unique_ptr<ParsedExpression>(new OperatorExpression(expr_type, move(arg)));
 }

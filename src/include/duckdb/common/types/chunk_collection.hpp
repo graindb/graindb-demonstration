@@ -38,6 +38,12 @@ public:
 		return types.size();
 	}
 
+	void Clear() {
+		count = 0;
+		chunks.clear();
+		types.clear();
+	}
+
 	//! Append a new DataChunk directly to this ChunkCollection
 	void Append(DataChunk &new_chunk);
 
@@ -57,7 +63,7 @@ public:
 		return chunks.size() == 0 ? "ChunkCollection [ 0 ]"
 		                          : "ChunkCollection [ " + std::to_string(count) + " ]: \n" + chunks[0]->ToString();
 	}
-	void Print();
+	void Print() const;
 
 	//! Gets a reference to the chunk at the given index
 	DataChunk &GetChunk(idx_t index) {

@@ -15,12 +15,11 @@ namespace duckdb {
 class SchemaCatalogEntry;
 
 struct BoundCreateInfo {
-	BoundCreateInfo() {
+	BoundCreateInfo() : schema(nullptr) {
 	}
-	BoundCreateInfo(unique_ptr<CreateInfo> base) : base(move(base)) {
+	explicit BoundCreateInfo(unique_ptr<CreateInfo> base) : schema(nullptr), base(move(base)) {
 	}
-	virtual ~BoundCreateInfo() {
-	}
+	virtual ~BoundCreateInfo() = default;
 
 	//! The schema to create the table in
 	SchemaCatalogEntry *schema;

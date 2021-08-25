@@ -10,6 +10,8 @@
 
 #include "duckdb/catalog/catalog_entry.hpp"
 
+#include <utility>
+
 namespace duckdb {
 class SchemaCatalogEntry;
 
@@ -17,10 +19,9 @@ class SchemaCatalogEntry;
 class StandardEntry : public CatalogEntry {
 public:
 	StandardEntry(CatalogType type, SchemaCatalogEntry *schema, Catalog *catalog, string name)
-	    : CatalogEntry(type, catalog, name), schema(schema) {
+	    : CatalogEntry(type, catalog, move(name)), schema(schema) {
 	}
-	virtual ~StandardEntry() {
-	}
+	~StandardEntry() override = default;
 
 	//! The schema the entry belongs to
 	SchemaCatalogEntry *schema;

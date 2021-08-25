@@ -27,9 +27,8 @@ public:
 		unordered_set<idx_t> bindings;
 		unique_ptr<Expression> filter;
 
-		Filter() {
-		}
-		Filter(unique_ptr<Expression> filter) : filter(move(filter)) {
+		Filter() = default;
+		explicit Filter(unique_ptr<Expression> filter) : filter(move(filter)) {
 		}
 
 		void ExtractBindings();

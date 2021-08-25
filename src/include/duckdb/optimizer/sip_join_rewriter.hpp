@@ -14,9 +14,6 @@ public:
 	void VisitOperator(LogicalOperator &op) override;
 
 private:
-	unordered_map<idx_t, vector<RAIInfo *>> rai_info_map;
-
-	void DoRewrite(LogicalComparisonJoin &join);
-	bool BindRAIInfo(LogicalComparisonJoin &join, vector<unique_ptr<RAI>> &rais, JoinCondition &condition);
+	bool RewriteInternal(LogicalComparisonJoin &join, idx_t join_cond_idx);
 };
 } // namespace duckdb

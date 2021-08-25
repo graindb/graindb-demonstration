@@ -29,7 +29,7 @@ class CatalogSet {
 	friend class DependencyManager;
 
 public:
-	CatalogSet(Catalog &catalog);
+	explicit CatalogSet(Catalog &catalog);
 
 	//! Create an entry in the catalog set. Returns whether or not it was
 	//! successful.
@@ -68,7 +68,7 @@ private:
 	//! safely call this
 	void DropEntryInternal(Transaction &transaction, CatalogEntry &entry, bool cascade, set_lock_map_t &lock_set);
 	//! Given a root entry, gets the entry valid for this transaction
-	CatalogEntry *GetEntryForTransaction(Transaction &transaction, CatalogEntry *current);
+	static CatalogEntry *GetEntryForTransaction(Transaction &transaction, CatalogEntry *current);
 
 	Catalog &catalog;
 	//! The catalog lock is used to make changes to the data

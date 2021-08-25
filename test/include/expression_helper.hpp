@@ -15,18 +15,19 @@ class ExpressionHelper {
 public:
 	ExpressionHelper();
 
-	unique_ptr<Expression> ParseExpression(string expression);
+	unique_ptr<Expression> ParseExpression(const string &expression);
 	unique_ptr<Expression> ApplyExpressionRule(unique_ptr<Expression> root);
 
-	unique_ptr<LogicalOperator> ParseLogicalTree(string query);
+	unique_ptr<LogicalOperator> ParseLogicalTree(const string &query) const;
+	unique_ptr<LogicalOperator> ParseAndOptimizeLogicalTree(const string &query) const;
 
 	template <class T> void AddRule() {
 		rewriter.rules.push_back(make_unique<T>(rewriter));
 	}
 
-	bool VerifyRewrite(string input, string expected_output, bool silent = false);
+	bool VerifyRewrite(const string &input, const string &expected_output, bool silent = false);
 
-	string AddColumns(string columns);
+	string AddColumns(const string &columns);
 
 	DuckDB db;
 	Connection con;

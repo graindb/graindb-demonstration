@@ -72,6 +72,6 @@ void PhysicalOperator::GetChunk(ClientContext &context, DataChunk &chunk, Physic
 	chunk.Verify();
 }
 
-void PhysicalOperator::Print() {
+void PhysicalOperator::Print() const {
 	Printer::Print(ToString());
 }

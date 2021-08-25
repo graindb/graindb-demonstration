@@ -55,12 +55,12 @@ TEST_CASE("Test queries found by Rigger that cause problems in other systems", "
 		result = con.Query("SELECT * FROM t1 WHERE (t1.c1 = CAST(8366271098608253588 AS REAL));");
 		REQUIRE(CHECK_COLUMN(result, 0, {Value::FLOAT(8366271098608253588)}));
 		result = con.Query("SELECT * FROM t0, t1 WHERE (t1.c1 = CAST(8366271098608253588 AS REAL));");
-		REQUIRE(CHECK_COLUMN(result, 0, {"a"}));
-		REQUIRE(CHECK_COLUMN(result, 1, {Value::FLOAT(8366271098608253588)}));
+		REQUIRE(CHECK_COLUMN(result, 0, {Value::FLOAT(8366271098608253588)}));
+		REQUIRE(CHECK_COLUMN(result, 1, {"a"}));
 		result = con.Query("SELECT * FROM t0, t1 WHERE (t1.c1 >= CAST(8366271098608253588 AS REAL) AND t1.c1 <= "
 		                   "CAST(8366271098608253588 AS REAL));");
-		REQUIRE(CHECK_COLUMN(result, 0, {"a"}));
-		REQUIRE(CHECK_COLUMN(result, 1, {Value::FLOAT(8366271098608253588)}));
+		REQUIRE(CHECK_COLUMN(result, 0, {Value::FLOAT(8366271098608253588)}));
+		REQUIRE(CHECK_COLUMN(result, 1, {"a"}));
 	}
 	SECTION("#24 Query results in a SEGFAULT") {
 		REQUIRE_NO_FAIL(con.Query("CREATE TABLE t0 (c0 INT, c1 INT, PRIMARY KEY (c0, c1));"));
@@ -371,9 +371,9 @@ TEST_CASE("Tests found by Rigger", "[rigger]") {
 		REQUIRE_NO_FAIL(con.Query("INSERT INTO t1 VALUES (0);"));
 		REQUIRE_NO_FAIL(con.Query("INSERT INTO t2 VALUES (0), (0);"));
 		result = con.Query("SELECT * FROM t1, t2, t0 WHERE CONCAT(t1.c0) OR t0.c0;");
-		REQUIRE(CHECK_COLUMN(result, 0, {0, 0}));
+		REQUIRE(CHECK_COLUMN(result, 0, {-1.0, -1.0}));
 		REQUIRE(CHECK_COLUMN(result, 1, {0, 0}));
-		REQUIRE(CHECK_COLUMN(result, 2, {-1.0, -1.0}));
+		REQUIRE(CHECK_COLUMN(result, 2, {0, 0}));
 	}
 	SECTION("527") {
 		// Query with JOIN and WHERE condition unexpectedly fetches a value not present in the table
@@ -445,8 +445,8 @@ TEST_CASE("Tests found by Rigger", "[rigger]") {
 		REQUIRE(CHECK_COLUMN(result, 0, {}));
 		result = con.Query("SELECT * FROM t0, t1 GROUP BY t0.c0, t1.c0 HAVING t1.c0!=MAX(t1.c0) UNION ALL SELECT * "
 		                   "FROM t0, t1 GROUP BY t0.c0, t1.c0 HAVING NOT t1.c0>MAX(t1.c0) ORDER BY 1, 2;");
-		REQUIRE(CHECK_COLUMN(result, 0, {0, 0}));
-		REQUIRE(CHECK_COLUMN(result, 1, {"0", "0.9201898334673894"}));
+		REQUIRE(CHECK_COLUMN(result, 0, {"0", "0.9201898334673894"}));
+		REQUIRE(CHECK_COLUMN(result, 1, {0, 0}));
 	}
 	SECTION("537") {
 		// Fetching from table and view results in a crash

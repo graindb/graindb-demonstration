@@ -23,12 +23,12 @@ class LogicalGet;
 class TableCatalogEntry;
 class TableFunctionCatalogEntry;
 
-enum class BindingType : uint8_t { TABLE = 0, SUBQUERY = 1, TABLE_FUNCTION = 2, GENERIC = 3 };
+enum class BindingType : uint8_t { TABLE = 0, SUBQUERY = 1, TABLE_FUNCTION = 2, GENERIC = 3, VERTEX = 4 };
 
 //! A Binding represents a binding to a table, table-producing function or subquery with a specified table index. Used
 //! in the binder.
 struct Binding {
-	Binding(BindingType type, const string &alias, idx_t index) : type(type), alias(alias), index(index) {
+	Binding(BindingType type, string alias, idx_t index) : type(type), alias(move(alias)), index(index) {
 	}
 	virtual ~Binding() = default;
 
@@ -54,6 +54,27 @@ public:
 	bool HasMatchingBinding(const string &column_name) override;
 	BindResult Bind(ColumnRefExpression &colref, idx_t depth) override;
 	void GenerateAllColumnExpressions(BindContext &context, vector<unique_ptr<ParsedExpression>> &select_list) override;
+};
+
+//! Represents a binding to a vertex
+struct VertexBinding : public Binding {
+	VertexBinding(const string &alias, VertexCatalogEntry &vertex, idx_t index)
+	    : Binding(BindingType::VERTEX, alias, index), vertex(vertex) {
+	}
+
+	VertexCatalogEntry &vertex;
+
+public:
+	bool HasMatchingBinding(const string &column_name) override {
+		throw NotImplementedException("VertexBinding doesn't support HasMatchingBinding.");
+	}
+	BindResult Bind(ColumnRefExpression &colref, idx_t depth) override {
+		throw NotImplementedException("VertexBinding doesn't support Bind.");
+	}
+	void GenerateAllColumnExpressions(BindContext &context,
+	                                  vector<unique_ptr<ParsedExpression>> &select_list) override {
+		throw NotImplementedException("VertexBinding doesn't support GenerateAllColumnExpressions.");
+	}
 };
 
 //! Represents a generic binding with types and names

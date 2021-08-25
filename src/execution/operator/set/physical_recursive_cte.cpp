@@ -1,7 +1,6 @@
 #include "duckdb/execution/operator/set/physical_recursive_cte.hpp"
 
 #include "duckdb/common/types/chunk_collection.hpp"
-#include "duckdb/common/vector_operations/vector_operations.hpp"
 #include "duckdb/execution/aggregate_hashtable.hpp"
 
 using namespace duckdb;
@@ -22,8 +21,10 @@ public:
 };
 
 PhysicalRecursiveCTE::PhysicalRecursiveCTE(LogicalOperator &op, bool union_all, unique_ptr<PhysicalOperator> top,
-                                           unique_ptr<PhysicalOperator> bottom)
-    : PhysicalOperator(PhysicalOperatorType::RECURSIVE_CTE, op.types), union_all(union_all) {
+                                           unique_ptr<PhysicalOperator> bottom, idx_t min_hop, idx_t max_hop,
+                                           bool enable_bottom_cache)
+    : PhysicalOperator(PhysicalOperatorType::RECURSIVE_CTE, op.types), union_all(union_all), min_hop(min_hop),
+      max_hop(max_hop), enable_bottom_cache(enable_bottom_cache) {
 	children.push_back(move(top));
 	children.push_back(move(bottom));
 }
@@ -56,7 +57,7 @@ void PhysicalRecursiveCTE::GetChunkInternal(ClientContext &context, DataChunk &c
 
 		if (chunk.size() == 0) {
 			// Done if there is nothing in the intermediate table
-			if (state->intermediate_empty) {
+			if (state->intermediate_empty || min_hop == max_hop) {
 				state->finished = true;
 				break;
 			}
@@ -70,9 +71,14 @@ void PhysicalRecursiveCTE::GetChunkInternal(ClientContext &context, DataChunk &c
 			intermediate_table.count = 0;
 			intermediate_table.chunks.clear();
 
-			state->bottom_state = children[1]->GetOperatorState();
+			if (enable_bottom_cache) {
+				state->bottom_state->Reset();
+			} else {
+				state->bottom_state = children[1]->GetOperatorState();
+			}
 
 			state->intermediate_empty = true;
+			min_hop++;
 			continue;
 		}
 

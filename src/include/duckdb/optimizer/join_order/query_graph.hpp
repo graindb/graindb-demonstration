@@ -8,12 +8,13 @@
 
 #pragma once
 
+#include "duckdb/catalog/catalog_entry/edge_catalog_entry.hpp"
 #include "duckdb/common/common.hpp"
 #include "duckdb/common/unordered_map.hpp"
 #include "duckdb/common/unordered_set.hpp"
+#include "duckdb/execution/index/rai/rel_adj_index.hpp"
 #include "duckdb/optimizer/join_order/join_relation.hpp"
 #include "duckdb/planner/column_binding.hpp"
-#include "duckdb/storage/rai.hpp"
 
 #include <functional>
 
@@ -22,7 +23,7 @@ class Expression;
 class LogicalOperator;
 
 struct FilterInfo {
-	idx_t filter_index;
+	idx_t filter_index = 0;
 	JoinRelationSet *left_set = nullptr;
 	JoinRelationSet *right_set = nullptr;
 	JoinRelationSet *set = nullptr;
@@ -49,10 +50,10 @@ public:
 
 public:
 	string ToString() const;
-	void Print();
+	void Print() const;
 
 	//! Create an edge in the edge_set
-	void CreateEdge(JoinRelationSet *left, JoinRelationSet *right, FilterInfo *info, bool has_equality);
+	void CreateEdge(JoinRelationSet *left, JoinRelationSet *right, FilterInfo *info);
 	//! Returns a connection if there is an edge that connects these two sets, or nullptr otherwise
 	NeighborInfo *GetConnection(JoinRelationSet *node, JoinRelationSet *other);
 	//! Enumerate the neighbors of a specific node that do not belong to any of the exclusion_set. Note that if a

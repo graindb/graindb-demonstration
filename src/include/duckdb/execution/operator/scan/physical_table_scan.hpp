@@ -41,7 +41,7 @@ public:
 public:
 	bool PushdownZoneFilter(idx_t table_index, const shared_ptr<bitmask_vector> &zone_filter,
 	                        const shared_ptr<bitmask_vector> &zone_sel) override;
-	bool PushdownRowsFilter(idx_t table_index, const shared_ptr<rows_vector> &rows_filter, idx_t count) override;
+	bool PushdownRowsFilter(idx_t table_index, const shared_ptr<vector<row_t>> &rows_filter, idx_t count) override;
 	void PerformSeqScan(DataChunk &chunk, PhysicalOperatorState *state_, Transaction &transaction);
 	void PerformLookup(DataChunk &chunk, PhysicalOperatorState *state_, SelectionVector *sel, Vector *rid_vector,
 	                   DataChunk *rai_chunk, Transaction &transaction);
@@ -53,7 +53,7 @@ public:
 
 private:
 	//! The rows filter
-	shared_ptr<rows_vector> rows_filter;
+	shared_ptr<vector<row_t>> rows_filter;
 	shared_ptr<bitmask_vector> row_bitmask;
 	shared_ptr<bitmask_vector> zone_bitmask;
 	row_t rows_count;

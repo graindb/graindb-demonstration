@@ -14,6 +14,7 @@
 #include "duckdb/optimizer/join_order/join_relation.hpp"
 #include "duckdb/optimizer/join_order/query_graph.hpp"
 #include "duckdb/parser/expression_map.hpp"
+#include "duckdb/planner/joinside.hpp"
 #include "duckdb/planner/logical_operator.hpp"
 #include "duckdb/planner/logical_operator_visitor.hpp"
 #include "duckdb/planner/operator/logical_get.hpp"
@@ -22,14 +23,11 @@
 #include <functional>
 #include <iostream>
 
-//#define LOG_ENUMERATION
-//#define PRINT_JOIN_NODE
-
 namespace duckdb {
 using json = nlohmann::json;
 
 struct JoinOrderNode {
-	OpMark op_mark;
+	OpHint op_hint;
 	vector<unique_ptr<JoinOrderNode>> children;
 	idx_t relation_id;
 };
@@ -44,36 +42,34 @@ public:
 		double cost;
 		JoinNode *left;
 		JoinNode *right;
-		OpMark op_mark;
+		OpHint op_hint;
 
 		//! Create a leaf node in the join tree
 		JoinNode(JoinRelationSet *set, idx_t cardinality)
 		    : set(set), info(nullptr), cardinality(cardinality), cost(cardinality), left(nullptr), right(nullptr),
-		      op_mark(OpMark::SCAN) {
-#ifdef LOG_ENUMERATION
-			cout << "Base set " + set->ToString() + ", Cardinality:" + to_string(cardinality) +
-			            ", Cost: " + to_string(cost)
-			     << endl;
-#endif
+		      op_hint(OpHint::SCAN) {
 		}
 		//! Create an intermediate node in the join tree
 		JoinNode(JoinRelationSet *set, NeighborInfo *info, JoinNode *left, JoinNode *right, idx_t cardinality,
-		         double cost, OpMark op_mark = OpMark::JOIN)
-		    : set(set), info(info), cardinality(cardinality), cost(cost), left(left), right(right), op_mark(op_mark) {
+		         double cost, OpHint op_hint = OpHint::JOIN)
+		    : set(set), info(info), cardinality(cardinality), cost(cost), left(left), right(right), op_hint(op_hint) {
 		}
 
-		static string OpMarkToString(OpMark mark) {
+		static string OpHintToString(OpHint mark) {
 			switch (mark) {
-			case OpMark::NLJ:
-			case OpMark::HASH_JOIN:
-			case OpMark::SIP_JOIN:
-			case OpMark::JOIN: {
+			case OpHint::NLJ:
+				return "NLJ";
+			case OpHint::HJ:
+				return "HASH JOIN";
+			case OpHint::SJ:
+				return "SIP JOIN";
+			case OpHint::JOIN: {
 				return "JOIN";
 			}
-			case OpMark::MERGED_SIP_JOIN: {
+			case OpHint::MSJ: {
+				return "MERGE SIP JOIN";
 			}
-				return "MERGE_JOIN";
-			case OpMark::SCAN: {
+			case OpHint::SCAN: {
 				return "SCAN";
 			}
 			default:
@@ -82,10 +78,10 @@ public:
 		}
 
 		static string ToJSONRecursive(const JoinNode &node) {
-			string result = "{ \"name\": \"" + OpMarkToString(node.op_mark) + "\",\n";
+			string result = R"({ "name": ")" + OpHintToString(node.op_hint) + "\",\n";
 			result += "\"timing\": 0.0,\n";
-			result += "\"cardinality\":" + to_string(node.cardinality) + ",\n";
-			result += "\"extra_info\": \"[cost: " + to_string(node.cost) + "]\",\n";
+			result += "\"cardinality\":" + std::to_string(node.cardinality) + ",\n";
+			result += R"("extra_info": "[cost: )" + std::to_string(node.cost) + "]\",\n";
 			result += "\"children\": [";
 			if (node.left) {
 				result += ToJSONRecursive(*node.left);
@@ -99,7 +95,7 @@ public:
 		}
 
 		string ToJSON() {
-			string result = "{ \"result\": " + to_string(0.1) + ",\n";
+			string result = "{ \"result\": " + std::to_string(0.1) + ",\n";
 			// print the phase timings
 			result += "\"timings\": {},\n";
 			// recursively print the physical operator tree
@@ -111,7 +107,7 @@ public:
 	};
 
 public:
-	JoinOrderOptimizer(ClientContext &context) : context(context) {
+	explicit JoinOrderOptimizer(ClientContext &context) : context(context) {
 	}
 	//! Perform join reordering inside a plan
 	unique_ptr<LogicalOperator> Optimize(unique_ptr<LogicalOperator> plan);
@@ -179,8 +175,11 @@ private:
 	//! Solve the join order approximately using a greedy algorithm
 	void SolveJoinOrderApproximately();
 	unique_ptr<JoinNode> CreateJoinTree(JoinRelationSet *set, NeighborInfo *info, JoinNode *left, JoinNode *right);
+	//! Find EDGEs that can be matched with the join node with given join condition in a bottom-up way
+	void TryMatchEdge(LogicalComparisonJoin *join, JoinCondition &cond);
+	//! Edge table index -> latest seen rai info
+	unordered_map<idx_t, JoinCondition *> matched_edges;
 
-	unique_ptr<LogicalOperator> ResolveJoinConditions(unique_ptr<LogicalOperator> op);
 	std::pair<JoinRelationSet *, unique_ptr<LogicalOperator>>
 	GenerateJoins(vector<unique_ptr<LogicalOperator>> &extracted_relations, JoinNode *node);
 };

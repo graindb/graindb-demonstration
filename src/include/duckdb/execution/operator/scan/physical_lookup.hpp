@@ -52,7 +52,7 @@ public:
 
 public:
 	template <class T>
-	void inline Lookup(ClientContext &context, ColumnData &column, row_t *row_ids, Vector &result, idx_t count,
+	void inline Lookup(ClientContext &context, ColumnData &column, const row_t *row_ids, Vector &result, idx_t count,
 	                   unordered_map<idx_t, data_ptr_t> &segment_ptrs, idx_t type_size = sizeof(T));
 	void GetChunkInternal(ClientContext &context, DataChunk &chunk, PhysicalOperatorState *state_,
 	                      SelectionVector *sel = nullptr, Vector *rid_vector = nullptr,

@@ -19,36 +19,43 @@ CreateStmt:	CREATE_P OptTemp TABLE qualified_name '(' OptTableElementList ')'
 					$$ = (PGNode *)n;
 				}
 		| CREATE_P OptTemp TABLE IF_P NOT EXISTS qualified_name '('
-		        OptTableElementList ')' OptWith
-		        OnCommitOption
-		                {
-		                        PGCreateStmt *n = makeNode(PGCreateStmt);
-		                        $7->relpersistence = $2;
-		                        n->relation = $7;
-		                        n->tableElts = $9;
-		                        n->ofTypename = NULL;
-		                        n->constraints = NIL;
-		                        n->options = $11;
-		                        n->oncommit = $12;
-		                        n->if_not_exists = true;
-		                        $$ = (PGNode *)n;
-		                }
+			OptTableElementList ')' OptWith
+			OnCommitOption
+				{
+					PGCreateStmt *n = makeNode(PGCreateStmt);
+					$7->relpersistence = $2;
+					n->relation = $7;
+					n->tableElts = $9;
+					n->ofTypename = NULL;
+					n->constraints = NIL;
+					n->options = $11;
+					n->oncommit = $12;
+					n->if_not_exists = true;
+					$$ = (PGNode *)n;
+				}
 		;
 
-CreateRAIStmt: CREATE_P OptTemp OptDirection RAI qualified_name ON qualified_name '(' FROM ColId REFERENCES qualified_name ',' TO ColId REFERENCES qualified_name ')'
+CreateVertexStmt: CREATE_P VERTEX qualified_name ON qualified_name
+            {
+                PGCreateVertexStmt *n = makeNode(PGCreateVertexStmt);
+                n->name = $3;
+                n->table = $5;
+                $$ = (PGNode *)n;
+            }
+        ;
+
+CreateEdgeStmt: CREATE_P EDGE qualified_name ON qualified_name '(' FROM qualified_name REFERENCES ColId ',' TO qualified_name REFERENCES ColId ')'
                 		{
-                			PGCreateRAIStmt *n = makeNode(PGCreateRAIStmt);
-                			n->direction = $3;
-                			n->name = $5;
-                			n->table = $7;
+                			PGCreateEdgeStmt *n = makeNode(PGCreateEdgeStmt);
+                			n->name = $3;
+                			n->table = $5;
+                			n->from_ref = $8;
                 			n->from_col = $10;
-                			n->from_ref = $12;
+                			n->to_ref = $13;
                 			n->to_col = $15;
-                			n->to_ref = $17;
                 			$$ = (PGNode *)n;
                 		}
                 ;
-
 
 ConstraintAttributeSpec:
 			/*EMPTY*/
@@ -388,40 +395,6 @@ columnDef:	ColId Typename create_generic_options ColQualList
 					n->location = @1;
 					$$ = (PGNode *)n;
 				}
-		| FROM ColId
-				{
-					PGColumnDef *n = makeNode(PGColumnDef);
-					n->colname = $2;
-					n->typeName = NULL;
-					n->inhcount = 0;
-					n->is_local = true;
-					n->is_not_null = false;
-					n->is_from_type = false;
-					n->storage = 0;
-					n->raw_default = NULL;
-					n->cooked_default = NULL;
-					n->collOid = InvalidOid;
-					n->fdwoptions = NULL;
-					n->location = @1;
-					$$ = (PGNode *)n;
-				}
-		| TO ColId
-				{
-					PGColumnDef *n = makeNode(PGColumnDef);
-					n->colname = $2;
-					n->typeName = NULL;
-					n->inhcount = 0;
-					n->is_local = true;
-					n->is_not_null = false;
-					n->is_from_type = false;
-					n->storage = 0;
-					n->raw_default = NULL;
-					n->cooked_default = NULL;
-					n->collOid = InvalidOid;
-					n->fdwoptions = NULL;
-					n->location = @1;
-					$$ = (PGNode *)n;
-				}
 		;
 
 
@@ -679,11 +652,6 @@ TableLikeClause:
 				}
 		;
 
-OptDirection:	UNDIRECTED		{ $$ = PG_RAI_UNDIRECTED; }
-			| DIRECTED	{ $$ = PG_RAI_DIRECTED; }
-			| SELF		{ $$ = PG_RAI_SELF; }
-			| PKFK		{ $$ = PG_RAI_PKFK; }
-			| /*EMPTY*/	{ $$ = PG_RAI_DIRECTED; }
 
 OptTemp:	TEMPORARY					{ $$ = PG_RELPERSISTENCE_TEMP; }
 			| TEMP						{ $$ = PG_RELPERSISTENCE_TEMP; }

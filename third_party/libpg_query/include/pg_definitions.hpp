@@ -8,6 +8,11 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string>
+
+#ifdef ERROR
+#undef ERROR
+#endif
 
 typedef uintptr_t PGDatum;
 typedef uint64_t PGSize;
@@ -33,7 +38,6 @@ typedef uint32_t PGOid;
 #define HIGHBIT (0x80)
 #define IS_HIGHBIT_SET(ch) ((unsigned char)(ch)&HIGHBIT)
 
-#define NAMEDATALEN 64
 #define FUNC_MAX_ARGS 100
 #define FLEXIBLE_ARRAY_MEMBER
 
@@ -44,29 +48,27 @@ typedef uint32_t PGOid;
 #define __thread __declspec(thread)
 #endif
 
-typedef struct {
-	int32_t vl_len_;    /* these fields must match ArrayType! */
-	int ndim;           /* always 1 for PGint2vector */
-	int32_t dataoffset; /* always 0 for PGint2vector */
-	PGOid elemtype;
-	int dim1;
-	int lbound1;
-	int16_t values[];
-} PGint2vector;
 
-typedef struct PGNameData {
-	char data[NAMEDATALEN];
-} PGNameData;
-typedef PGNameData *Name;
+//typedef struct {
+//	int32_t vl_len_;    /* these fields must match ArrayType! */
+//	int ndim;         /* always 1 for PGint2vector */
+//	int32_t dataoffset; /* always 0 for PGint2vector */
+//	PGOid elemtype;
+//	int dim1;
+//	int lbound1;
+//	int16_t values[];
+//} PGint2vector;
 
 struct pg_varlena {
-	char vl_len_[4]; /* Do not touch this field directly! */
-	char vl_dat[1];  /* Data content is here */
+	char vl_len_[4];                    /* Do not touch this field directly! */
+	char vl_dat[1]; /* Data content is here */
 };
 
 typedef struct pg_varlena bytea;
 
 typedef int PGMemoryContext;
+
+namespace duckdb_libpgquery {
 
 typedef enum PGPostgresParserErrors {
 	PG_ERRCODE_SYNTAX_ERROR,
@@ -85,16 +87,16 @@ typedef enum PGPostgresRelPersistence {
 	RELPERSISTENCE_PERMANENT
 } PGPostgresRelPersistence;
 
-typedef enum PGPostgresRAIDirection {
-	PG_RAI_UNDIRECTED,
-	PG_RAI_DIRECTED,
-	PG_RAI_PKFK,
-	PG_RAI_SELF
-} PGPostgresRAIDirection;
-
-typedef enum PGPostgresErrorLevel { PGUNDEFINED, PGNOTICE, PGWARNING, ERROR } PGPostgresErrorLevel;
+typedef enum PGPostgresErrorLevel {
+	PGUNDEFINED,
+	PGNOTICE,
+	PGWARNING,
+	ERROR
+} PGPostgresErrorLevel;
 
 typedef enum PGPostgresAttributIdentityTypes {
 	PG_ATTRIBUTE_IDENTITY_ALWAYS,
 	ATTRIBUTE_IDENTITY_BY_DEFAULT
 } PGPostgresAttributIdentityTypes;
+
+}

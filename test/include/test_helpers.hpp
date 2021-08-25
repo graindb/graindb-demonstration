@@ -18,16 +18,16 @@
 
 namespace duckdb {
 
-void DeleteDatabase(string path);
-void TestDeleteDirectory(string path);
-void TestCreateDirectory(string path);
-void TestDeleteFile(string path);
-string TestCreatePath(string suffix);
+void DeleteDatabase(const string &path);
+void TestDeleteDirectory(const string &path);
+void TestCreateDirectory(const string &path);
+void TestDeleteFile(const string &path);
+string TestCreatePath(const string &suffix);
 unique_ptr<DBConfig> GetTestConfig();
 
 string GetCSVPath();
-void WriteCSV(string path, const char *csv);
-void WriteBinary(string path, const uint8_t *data, uint64_t length);
+void WriteCSV(const string &path, const char *csv);
+void WriteBinary(const string &path, const uint8_t *data, uint64_t length);
 
 bool NO_FAIL(QueryResult &result);
 bool NO_FAIL(unique_ptr<QueryResult> result);

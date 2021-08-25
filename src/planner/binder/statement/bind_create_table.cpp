@@ -1,11 +1,11 @@
 #include "duckdb/parser/constraints/list.hpp"
 #include "duckdb/parser/expression/cast_expression.hpp"
+#include "duckdb/parser/parsed_data/create_table_info.hpp"
 #include "duckdb/planner/binder.hpp"
 #include "duckdb/planner/constraints/list.hpp"
 #include "duckdb/planner/expression/bound_constant_expression.hpp"
 #include "duckdb/planner/expression_binder/check_binder.hpp"
 #include "duckdb/planner/expression_binder/constant_binder.hpp"
-#include "duckdb/parser/parsed_data/create_table_info.hpp"
 #include "duckdb/planner/parsed_data/bound_create_table_info.hpp"
 
 using namespace duckdb;
@@ -135,7 +135,7 @@ unique_ptr<BoundCreateTableInfo> Binder::BindCreateTableInfo(unique_ptr<CreateIn
 		auto &sql_types = query_obj.types;
 		assert(names.size() == sql_types.size());
 		for (idx_t i = 0; i < names.size(); i++) {
-			base.columns.push_back(ColumnDefinition(names[i], sql_types[i]));
+			base.columns.emplace_back(names[i], sql_types[i]);
 		}
 		// create the name map for the statement
 		CreateColumnMap(*result);

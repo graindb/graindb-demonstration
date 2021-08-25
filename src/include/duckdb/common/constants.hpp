@@ -29,6 +29,7 @@ using std::vector;
 #define DEFAULT_SCHEMA "main"
 #define TEMP_SCHEMA "temp"
 #define INVALID_SCHEMA ""
+#define JOIN_INDEX_POSTFIX "_join_index"
 
 //! The vector size used in the execution engine
 #ifndef STANDARD_VECTOR_SIZE
@@ -46,14 +47,8 @@ using std::vector;
 #define ENABLE_PROFILING false
 
 //! Params for experiment evaluation
-#define ENABLE_ALISTS true
-#define ENABLE_RAI_JOIN_MERGE true
-#define ENABLE_RID_HT false
-#define ENABLE_LOOKUP_JOIN false
-#define ENABLE_LOOKUP_FILTER false
-#define ENABLE_ZONE_FILTER false
+#define ENABLE_RAI_JOIN_MERGE false
 #define ENABLE_ADAPTIVE_FILTER false
-#define ENABLE_ADAPTIVE_JOIN true
 
 //! a saner size_t for loop indices etc
 typedef uint64_t idx_t;
@@ -87,9 +82,13 @@ typedef idx_t transaction_t;
 typedef idx_t column_t;
 //! Special value used to signify the ROW ID of a table
 extern const column_t COLUMN_IDENTIFIER_ROW_ID;
+extern const string COLUMN_NAME_ROW_ID;
 
 //! The maximum row identifier used in tables
 extern const row_t MAX_ROW_ID;
+
+//! The bitmask vector used by sip joins
+typedef vector<bool> bitmask_vector;
 
 //! Zero selection vector: completely filled with the value 0 [READ ONLY]
 extern const sel_t ZERO_VECTOR[STANDARD_VECTOR_SIZE];

@@ -1,14 +1,15 @@
+#include "grammar.hh"
+
+#include "impedance.hh"
+#include "random.hh"
+#include "relmodel.hh"
+#include "schema.hh"
+
 #include <algorithm>
 #include <cassert>
 #include <numeric>
 #include <stdexcept>
 #include <typeinfo>
-
-#include "random.hh"
-#include "relmodel.hh"
-#include "grammar.hh"
-#include "schema.hh"
-#include "impedance.hh"
 
 using namespace std;
 

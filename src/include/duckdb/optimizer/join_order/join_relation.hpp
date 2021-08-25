@@ -19,14 +19,10 @@ class LogicalOperator;
 struct SingleJoinRelation {
 	LogicalOperator *op;
 	LogicalOperator *parent;
-	idx_t relation_oid;
 
-	SingleJoinRelation() {
+	SingleJoinRelation() : op(nullptr), parent(nullptr) {
 	}
-	SingleJoinRelation(LogicalOperator *op, LogicalOperator *parent) : op(op), parent(parent), relation_oid(0) {
-	}
-	SingleJoinRelation(LogicalOperator *op, LogicalOperator *parent, idx_t relation_oid)
-	    : op(op), parent(parent), relation_oid(relation_oid) {
+	SingleJoinRelation(LogicalOperator *op, LogicalOperator *parent) : op(op), parent(parent) {
 	}
 };
 
@@ -35,35 +31,12 @@ struct JoinRelationSet {
 	JoinRelationSet(unique_ptr<idx_t[]> relations, idx_t count) : relations(move(relations)), count(count) {
 	}
 
-//	explicit JoinRelationSet(unordered_set<idx_t> &relation_set) {
-//		count = relation_set.size();
-//		unique_ptr<idx_t[]> relation(new idx_t[count]);
-//		idx_t index = 0;
-//		for (auto &rel : relation_set) {
-//			relation[index++] = rel;
-//		}
-//		std::sort(&relation.operator[](0), &relation.operator[](0) + count);
-//		relations = move(relation);
-//	}
-
-//	explicit JoinRelationSet(vector<idx_t> &relation_set) {
-//		count = relation_set.size();
-//		unique_ptr<idx_t[]> relation(new idx_t[count]);
-//		idx_t index = 0;
-//		for (auto &rel : relation_set) {
-//			relation[index++] = rel;
-//		}
-//		std::sort(&relation.operator[](0), &relation.operator[](0) + count);
-//		relations = move(relation);
-//	}
-
 	string ToString() const;
 
 	unique_ptr<idx_t[]> relations;
 	idx_t count;
 
 	static bool IsSubset(JoinRelationSet *super, JoinRelationSet *sub);
-	//	void Subtraction(JoinRelationSet *other);
 };
 
 //! The JoinRelationTree is a structure holding all the created JoinRelationSet objects and allowing fast lookup on to

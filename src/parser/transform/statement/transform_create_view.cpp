@@ -5,11 +5,11 @@
 using namespace duckdb;
 using namespace std;
 
-unique_ptr<CreateStatement> Transformer::TransformCreateView(PGNode *node) {
+unique_ptr<CreateStatement> Transformer::TransformCreateView(duckdb_libpgquery::PGNode *node) {
 	assert(node);
-	assert(node->type == T_PGViewStmt);
+	assert(node->type == duckdb_libpgquery::T_PGViewStmt);
 
-	auto stmt = reinterpret_cast<PGViewStmt *>(node);
+	auto stmt = reinterpret_cast<duckdb_libpgquery::PGViewStmt *>(node);
 	assert(stmt);
 	assert(stmt->view);
 
@@ -26,14 +26,14 @@ unique_ptr<CreateStatement> Transformer::TransformCreateView(PGNode *node) {
 	}
 	info->on_conflict = stmt->replace ? OnCreateConflict::REPLACE : OnCreateConflict::ERROR;
 
-	info->query = TransformSelectNode((PGSelectStmt *)stmt->query);
+	info->query = TransformSelectNode((duckdb_libpgquery::PGSelectStmt *)stmt->query);
 
 	if (stmt->aliases && stmt->aliases->length > 0) {
 		for (auto c = stmt->aliases->head; c != NULL; c = lnext(c)) {
-			auto node = reinterpret_cast<PGNode *>(c->data.ptr_value);
+			auto node = reinterpret_cast<duckdb_libpgquery::PGNode *>(c->data.ptr_value);
 			switch (node->type) {
-			case T_PGString: {
-				auto val = (PGValue *)node;
+			case duckdb_libpgquery::T_PGString: {
+				auto val = (duckdb_libpgquery::PGValue *)node;
 				info->aliases.push_back(string(val->val.str));
 				break;
 			}
@@ -50,7 +50,7 @@ unique_ptr<CreateStatement> Transformer::TransformCreateView(PGNode *node) {
 		throw NotImplementedException("VIEW options");
 	}
 
-	if (stmt->withCheckOption != PGViewCheckOption::PG_NO_CHECK_OPTION) {
+	if (stmt->withCheckOption != duckdb_libpgquery::PGViewCheckOption::PG_NO_CHECK_OPTION) {
 		throw NotImplementedException("VIEW CHECK options");
 	}
 	result->info = move(info);

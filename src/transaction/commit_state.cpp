@@ -1,12 +1,12 @@
 #include "duckdb/transaction/commit_state.hpp"
-#include "duckdb/transaction/delete_info.hpp"
-#include "duckdb/transaction/update_info.hpp"
 
-#include "duckdb/storage/data_table.hpp"
-#include "duckdb/storage/write_ahead_log.hpp"
-#include "duckdb/storage/uncompressed_segment.hpp"
 #include "duckdb/common/serializer/buffered_deserializer.hpp"
 #include "duckdb/parser/parsed_data/alter_table_info.hpp"
+#include "duckdb/storage/data_table.hpp"
+#include "duckdb/storage/uncompressed_segment.hpp"
+#include "duckdb/storage/write_ahead_log.hpp"
+#include "duckdb/transaction/delete_info.hpp"
+#include "duckdb/transaction/update_info.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -46,6 +46,12 @@ void CommitState::WriteCatalogEntry(CatalogEntry *entry, data_ptr_t dataptr) {
 			log->WriteCreateTable((TableCatalogEntry *)parent);
 		}
 		break;
+	case CatalogType::VERTEX:
+		log->WriteCreateVertex((VertexCatalogEntry *)parent);
+		break;
+	case CatalogType::EDGE:
+		log->WriteCreateEdge((EdgeCatalogEntry *)parent);
+		break;
 	case CatalogType::SCHEMA:
 		if (entry->type == CatalogType::SCHEMA) {
 			// ALTER TABLE statement, skip it
@@ -74,13 +80,11 @@ void CommitState::WriteCatalogEntry(CatalogEntry *entry, data_ptr_t dataptr) {
 			throw NotImplementedException("Don't know how to drop this type!");
 		}
 		break;
-
 	case CatalogType::INDEX:
 	case CatalogType::PREPARED_STATEMENT:
 	case CatalogType::AGGREGATE_FUNCTION:
 	case CatalogType::SCALAR_FUNCTION:
 	case CatalogType::TABLE_FUNCTION:
-
 		// do nothing, we log the query to recreate this
 		break;
 	default:

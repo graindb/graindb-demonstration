@@ -31,7 +31,9 @@
 
 #include "parser/gramparse.hpp"
 #include "parser/parser.hpp"
+#include "parser/kwlist.hpp"
 
+namespace duckdb_libpgquery {
 
 /*
  * raw_parser
@@ -40,16 +42,13 @@
  * Returns a list of raw (un-analyzed) parse trees.  The immediate elements
  * of the list are always PGRawStmt nodes.
  */
-PGList *
-raw_parser(const char *str)
-{
+PGList *raw_parser(const char *str) {
 	core_yyscan_t yyscanner;
 	base_yy_extra_type yyextra;
-	int			yyresult;
+	int yyresult;
 
 	/* initialize the flex scanner */
-	yyscanner = scanner_init(str, &yyextra.core_yy_extra,
-							 ScanKeywords, NumScanKeywords);
+	yyscanner = scanner_init(str, &yyextra.core_yy_extra, ScanKeywords, NumScanKeywords);
 
 	/* base_yylex() only needs this much initialization */
 	yyextra.have_lookahead = false;
@@ -63,11 +62,77 @@ raw_parser(const char *str)
 	/* Clean up (release memory) */
 	scanner_finish(yyscanner);
 
-	if (yyresult)				/* error */
+	if (yyresult) /* error */
 		return NIL;
 
 	return yyextra.parsetree;
 }
+
+bool is_keyword(const char *text) {
+	return ScanKeywordLookup(text, ScanKeywords, NumScanKeywords) != NULL;
+}
+
+std::vector<PGSimplifiedToken> tokenize(const char *str) {
+	core_yyscan_t yyscanner;
+	base_yy_extra_type yyextra;
+
+	std::vector<PGSimplifiedToken> result;
+	yyscanner = scanner_init(str, &yyextra.core_yy_extra, ScanKeywords, NumScanKeywords);
+	yyextra.have_lookahead = false;
+
+	while(true) {
+		YYSTYPE type;
+		YYLTYPE loc;
+		int token;
+		try {
+			token = base_yylex(&type, &loc, yyscanner);
+		} catch(...) {
+			token = 0;
+		}
+		if (token == 0) {
+			break;
+		}
+		PGSimplifiedToken current_token;
+		switch(token) {
+		case IDENT:
+			current_token.type = PGSimplifiedTokenType::PG_SIMPLIFIED_TOKEN_IDENTIFIER;
+			break;
+		case ICONST:
+		case FCONST:
+			current_token.type = PGSimplifiedTokenType::PG_SIMPLIFIED_TOKEN_NUMERIC_CONSTANT;
+			break;
+		case SCONST:
+		case BCONST:
+		case XCONST:
+			current_token.type = PGSimplifiedTokenType::PG_SIMPLIFIED_TOKEN_STRING_CONSTANT;
+			break;
+		case Op:
+		case PARAM:
+		case COLON_EQUALS:
+		case EQUALS_GREATER:
+		case LESS_EQUALS:
+		case GREATER_EQUALS:
+		case NOT_EQUALS:
+			current_token.type = PGSimplifiedTokenType::PG_SIMPLIFIED_TOKEN_OPERATOR;
+			break;
+		default:
+			if (token >= 255) {
+				// non-ascii value, probably a keyword
+				current_token.type = PGSimplifiedTokenType::PG_SIMPLIFIED_TOKEN_KEYWORD;
+			} else {
+				// ascii value, probably an operator
+				current_token.type = PGSimplifiedTokenType::PG_SIMPLIFIED_TOKEN_OPERATOR;
+			}
+			break;
+		}
+		current_token.start = loc;
+		result.push_back(current_token);
+	}
+
+	scanner_finish(yyscanner);
+	return result;
+}
+
 
 
 /*
@@ -87,25 +152,21 @@ raw_parser(const char *str)
  * the core_YYSTYPE and YYSTYPE representations (which are really the
  * same thing anyway, but notationally they're different).
  */
-int
-base_yylex(YYSTYPE *lvalp, YYLTYPE *llocp, core_yyscan_t yyscanner)
-{
+int base_yylex(YYSTYPE *lvalp, YYLTYPE *llocp, core_yyscan_t yyscanner) {
 	base_yy_extra_type *yyextra = pg_yyget_extra(yyscanner);
-	int			cur_token;
-	int			next_token;
-	int			cur_token_length;
-	YYLTYPE		cur_yylloc;
+	int cur_token;
+	int next_token;
+	int cur_token_length;
+	YYLTYPE cur_yylloc;
 
 	/* Get next token --- we might already have it */
-	if (yyextra->have_lookahead)
-	{
+	if (yyextra->have_lookahead) {
 		cur_token = yyextra->lookahead_token;
 		lvalp->core_yystype = yyextra->lookahead_yylval;
 		*llocp = yyextra->lookahead_yylloc;
 		*(yyextra->lookahead_end) = yyextra->lookahead_hold_char;
 		yyextra->have_lookahead = false;
-	}
-	else
+	} else
 		cur_token = core_yylex(&(lvalp->core_yystype), llocp, yyscanner);
 
 	/*
@@ -114,19 +175,18 @@ base_yylex(YYSTYPE *lvalp, YYLTYPE *llocp, core_yyscan_t yyscanner)
 	 * since we have such a small set of possibilities, hardwiring seems
 	 * feasible and more efficient.)
 	 */
-	switch (cur_token)
-	{
-		case NOT:
-			cur_token_length = 3;
-			break;
-		case NULLS_P:
-			cur_token_length = 5;
-			break;
-		case WITH:
-			cur_token_length = 4;
-			break;
-		default:
-			return cur_token;
+	switch (cur_token) {
+	case NOT:
+		cur_token_length = 3;
+		break;
+	case NULLS_P:
+		cur_token_length = 5;
+		break;
+	case WITH:
+		cur_token_length = 4;
+		break;
+	default:
+		return cur_token;
 	}
 
 	/*
@@ -134,8 +194,7 @@ base_yylex(YYSTYPE *lvalp, YYLTYPE *llocp, core_yyscan_t yyscanner)
 	 * '\0' here, and will undo that when we call it again.  We need to redo
 	 * it to fully revert the lookahead call for error reporting purposes.
 	 */
-	yyextra->lookahead_end = yyextra->core_yy_extra.scanbuf +
-		*llocp + cur_token_length;
+	yyextra->lookahead_end = yyextra->core_yy_extra.scanbuf + *llocp + cur_token_length;
 	Assert(*(yyextra->lookahead_end) == '\0');
 
 	/*
@@ -161,44 +220,42 @@ base_yylex(YYSTYPE *lvalp, YYLTYPE *llocp, core_yyscan_t yyscanner)
 	yyextra->have_lookahead = true;
 
 	/* Replace cur_token if needed, based on lookahead */
-	switch (cur_token)
-	{
-		case NOT:
-			/* Replace NOT by NOT_LA if it's followed by BETWEEN, IN, etc */
-			switch (next_token)
-			{
-				case BETWEEN:
-				case IN_P:
-				case LIKE:
-				case ILIKE:
-				case SIMILAR:
-					cur_token = NOT_LA;
-					break;
-			}
+	switch (cur_token) {
+	case NOT:
+		/* Replace NOT by NOT_LA if it's followed by BETWEEN, IN, etc */
+		switch (next_token) {
+		case BETWEEN:
+		case IN_P:
+		case LIKE:
+		case ILIKE:
+		case SIMILAR:
+			cur_token = NOT_LA;
 			break;
+		}
+		break;
 
-		case NULLS_P:
-			/* Replace NULLS_P by NULLS_LA if it's followed by FIRST or LAST */
-			switch (next_token)
-			{
-				case FIRST_P:
-				case LAST_P:
-					cur_token = NULLS_LA;
-					break;
-			}
+	case NULLS_P:
+		/* Replace NULLS_P by NULLS_LA if it's followed by FIRST or LAST */
+		switch (next_token) {
+		case FIRST_P:
+		case LAST_P:
+			cur_token = NULLS_LA;
 			break;
+		}
+		break;
 
-		case WITH:
-			/* Replace WITH by WITH_LA if it's followed by TIME or ORDINALITY */
-			switch (next_token)
-			{
-				case TIME:
-				case ORDINALITY:
-					cur_token = WITH_LA;
-					break;
-			}
+	case WITH:
+		/* Replace WITH by WITH_LA if it's followed by TIME or ORDINALITY */
+		switch (next_token) {
+		case TIME:
+		case ORDINALITY:
+			cur_token = WITH_LA;
 			break;
+		}
+		break;
 	}
 
 	return cur_token;
+}
+
 }

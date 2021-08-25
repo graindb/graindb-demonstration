@@ -30,7 +30,7 @@ unique_ptr<LogicalOperator> FilterPushdown::Rewrite(unique_ptr<LogicalOperator> 
 		return PushdownSetOperation(move(op));
 	case LogicalOperatorType::DISTINCT:
 	case LogicalOperatorType::ORDER_BY:
-	case LogicalOperatorType::CREATE_RAI: {
+	case LogicalOperatorType::CREATE_EDGE: {
 		// we can just push directly through these operations without any rewriting
 		op->children[0] = Rewrite(move(op->children[0]));
 		return op;

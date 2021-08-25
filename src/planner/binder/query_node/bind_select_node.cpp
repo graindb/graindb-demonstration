@@ -1,9 +1,10 @@
+#include "duckdb/execution/expression_executor.hpp"
 #include "duckdb/parser/expression/columnref_expression.hpp"
 #include "duckdb/parser/expression/constant_expression.hpp"
+#include "duckdb/parser/expression/table_star_expression.hpp"
 #include "duckdb/parser/query_node/select_node.hpp"
 #include "duckdb/parser/tableref/joinref.hpp"
 #include "duckdb/planner/binder.hpp"
-#include "duckdb/execution/expression_executor.hpp"
 #include "duckdb/planner/expression_binder/constant_binder.hpp"
 #include "duckdb/planner/expression_binder/group_binder.hpp"
 #include "duckdb/planner/expression_binder/having_binder.hpp"
@@ -11,14 +12,15 @@
 #include "duckdb/planner/expression_binder/select_binder.hpp"
 #include "duckdb/planner/expression_binder/where_binder.hpp"
 #include "duckdb/planner/query_node/bound_select_node.hpp"
-#include "duckdb/parser/expression/table_star_expression.hpp"
+
+#include <utility>
 
 using namespace std;
 
 namespace duckdb {
 
 static int64_t BindConstant(Binder &binder, ClientContext &context, string clause, unique_ptr<ParsedExpression> &expr) {
-	ConstantBinder constant_binder(binder, context, clause);
+	ConstantBinder constant_binder(binder, context, move(clause));
 	auto bound_expr = constant_binder.Bind(expr);
 	Value value = ExpressionExecutor::EvaluateScalar(*bound_expr);
 	if (!TypeIsNumeric(value.type)) {
@@ -70,8 +72,8 @@ void Binder::BindModifiers(OrderBinder &order_binder, QueryNode &statement, Boun
 		case ResultModifierType::DISTINCT_MODIFIER: {
 			auto &distinct = (DistinctModifier &)*mod;
 			auto bound_distinct = make_unique<BoundDistinctModifier>();
-			for (idx_t i = 0; i < distinct.distinct_on_targets.size(); i++) {
-				auto expr = BindOrderExpression(order_binder, move(distinct.distinct_on_targets[i]));
+			for (auto &distinct_on_target : distinct.distinct_on_targets) {
+				auto expr = BindOrderExpression(order_binder, move(distinct_on_target));
 				if (!expr) {
 					continue;
 				}
@@ -83,16 +85,16 @@ void Binder::BindModifiers(OrderBinder &order_binder, QueryNode &statement, Boun
 		case ResultModifierType::ORDER_MODIFIER: {
 			auto &order = (OrderModifier &)*mod;
 			auto bound_order = make_unique<BoundOrderModifier>();
-			for (idx_t i = 0; i < order.orders.size(); i++) {
+			for (auto &i : order.orders) {
 				BoundOrderByNode node;
-				node.type = order.orders[i].type;
-				node.expression = BindOrderExpression(order_binder, move(order.orders[i].expression));
+				node.type = i.type;
+				node.expression = BindOrderExpression(order_binder, move(i.expression));
 				if (!node.expression) {
 					continue;
 				}
 				bound_order->orders.push_back(move(node));
 			}
-			if (bound_order->orders.size() > 0) {
+			if (!bound_order->orders.empty()) {
 				bound_modifier = move(bound_order);
 			}
 			break;
@@ -114,16 +116,15 @@ void Binder::BindModifierTypes(BoundQueryNode &result, const vector<SQLType> &sq
 		switch (bound_mod->type) {
 		case ResultModifierType::DISTINCT_MODIFIER: {
 			auto &distinct = (BoundDistinctModifier &)*bound_mod;
-			if (distinct.target_distincts.size() == 0) {
+			if (distinct.target_distincts.empty()) {
 				// DISTINCT without a target: push references to the standard select list
 				for (idx_t i = 0; i < sql_types.size(); i++) {
-					distinct.target_distincts.push_back(
-					    make_unique<BoundColumnRefExpression>(GetInternalType(sql_types[i]), ColumnBinding(projection_index, i)));
+					distinct.target_distincts.push_back(make_unique<BoundColumnRefExpression>(
+					    GetInternalType(sql_types[i]), ColumnBinding(projection_index, i)));
 				}
 			} else {
 				// DISTINCT with target list: set types
-				for (idx_t i = 0; i < distinct.target_distincts.size(); i++) {
-					auto &expr = distinct.target_distincts[i];
+				for (auto &expr : distinct.target_distincts) {
 					assert(expr->type == ExpressionType::BOUND_COLUMN_REF);
 					auto &bound_colref = (BoundColumnRefExpression &)*expr;
 					if (bound_colref.binding.column_index == INVALID_INDEX) {
@@ -133,19 +134,20 @@ void Binder::BindModifierTypes(BoundQueryNode &result, const vector<SQLType> &sq
 					bound_colref.return_type = GetInternalType(sql_types[bound_colref.binding.column_index]);
 				}
 			}
-			for(idx_t i = 0; i < distinct.target_distincts.size(); i++) {
-				auto &bound_colref = (BoundColumnRefExpression &)*distinct.target_distincts[i];
+			for (auto &target_distinct : distinct.target_distincts) {
+				auto &bound_colref = (BoundColumnRefExpression &)*target_distinct;
 				auto sql_type = sql_types[bound_colref.binding.column_index];
 				if (sql_type.id == SQLTypeId::VARCHAR) {
-					distinct.target_distincts[i] = ExpressionBinder::PushCollation(context, move(distinct.target_distincts[i]), sql_type.collation, true);
+					target_distinct =
+					    ExpressionBinder::PushCollation(context, move(target_distinct), sql_type.collation, true);
 				}
 			}
 			break;
 		}
 		case ResultModifierType::ORDER_MODIFIER: {
 			auto &order = (BoundOrderModifier &)*bound_mod;
-			for (idx_t i = 0; i < order.orders.size(); i++) {
-				auto &expr = order.orders[i].expression;
+			for (auto &i : order.orders) {
+				auto &expr = i.expression;
 				assert(expr->type == ExpressionType::BOUND_COLUMN_REF);
 				auto &bound_colref = (BoundColumnRefExpression &)*expr;
 				if (bound_colref.binding.column_index == INVALID_INDEX) {
@@ -155,7 +157,7 @@ void Binder::BindModifierTypes(BoundQueryNode &result, const vector<SQLType> &sq
 				auto sql_type = sql_types[bound_colref.binding.column_index];
 				bound_colref.return_type = GetInternalType(sql_types[bound_colref.binding.column_index]);
 				if (sql_type.id == SQLTypeId::VARCHAR) {
-					order.orders[i].expression = ExpressionBinder::PushCollation(context, move(order.orders[i].expression), sql_type.collation);
+					i.expression = ExpressionBinder::PushCollation(context, move(i.expression), sql_type.collation);
 				}
 			}
 			break;
@@ -179,14 +181,14 @@ unique_ptr<BoundQueryNode> Binder::BindNode(SelectNode &statement) {
 	result->from_table = Bind(*statement.from_table);
 
 	// visit the select list and expand any "*" statements
+	// todo: expand path variables
 	vector<unique_ptr<ParsedExpression>> new_select_list;
 	for (auto &select_element : statement.select_list) {
 		if (select_element->GetExpressionType() == ExpressionType::STAR) {
 			// * statement, expand to all columns from the FROM clause
 			bind_context.GenerateAllColumnExpressions(new_select_list);
 		} else if (select_element->GetExpressionType() == ExpressionType::TABLE_STAR) {
-			auto table_star =
-			    (TableStarExpression *)select_element.get(); // TODO this cast to explicit class is a bit dirty?
+			auto table_star = (TableStarExpression *)select_element.get();
 			bind_context.GenerateAllColumnExpressions(new_select_list, table_star->relation_name);
 		} else {
 			// regular statement, add it to the list
@@ -222,7 +224,7 @@ unique_ptr<BoundQueryNode> Binder::BindNode(SelectNode &statement) {
 
 	vector<unique_ptr<ParsedExpression>> unbound_groups;
 	BoundGroupInformation info;
-	if (statement.groups.size() > 0) {
+	if (!statement.groups.empty()) {
 		// the statement has a GROUP BY clause, bind it
 		unbound_groups.resize(statement.groups.size());
 		GroupBinder group_binder(*this, context, statement, result->group_index, alias_map, info.alias_map);
@@ -294,7 +296,7 @@ unique_ptr<BoundQueryNode> Binder::BindNode(SelectNode &statement) {
 	// i.e. in the query [SELECT i, SUM(i) FROM integers;] the "i" will be bound as a normal column
 	// since we have an aggregation, we need to either (1) throw an error, or (2) wrap the column in a FIRST() aggregate
 	// we choose the former one [CONTROVERSIAL: this is the PostgreSQL behavior]
-	if (result->groups.size() > 0 || result->aggregates.size() > 0 || statement.having) {
+	if (!result->groups.empty() || !result->aggregates.empty() || statement.having) {
 		if (statement.aggregate_handling == AggregateHandling::NO_AGGREGATES_ALLOWED) {
 			throw BinderException("Aggregates cannot be present in a Project relation!");
 		} else if (statement.aggregate_handling == AggregateHandling::STANDARD_HANDLING) {

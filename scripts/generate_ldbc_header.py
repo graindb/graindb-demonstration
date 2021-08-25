@@ -106,14 +106,14 @@ const char *LDBC_TABLE_NAMES[] = {
 };
 
 const char *LDBC_TABLE_DDL[] = {
-    "create table comment (c_id bigint not null, id bigint not null, vid varchar, c_creationdate bigint not null, c_locationip varchar not null, c_browserused int not null, c_content text not null, c_length int not null, c_creatorid bigint, c_locationid bigint, c_replyof_post bigint, c_replyof_comment bigint );",
-    "create table post (ps_id bigint not null, id bigint not null, vid varchar, ps_imagefile varchar, ps_creationdate bigint not null, ps_locationip varchar not null, ps_browserused int not null, ps_language varchar, ps_content text, ps_length int not null, ps_creatorid bigint, ps_forumid bigint, ps_locationid bigint );",
-    "create table forum (f_forumid bigint not null, id bigint not null, vid varchar, f_title varchar not null, f_creationdate bigint not null, f_moderatorid bigint );",
-    "create table organisation (o_organisationid bigint not null, id bigint not null, vid varchar, o_type int not null, o_name varchar not null, o_url varchar not null, o_placeid bigint );",
-    "create table person (p_personid bigint not null, id bigint not null, vid varchar, p_firstname varchar not null, p_lastname varchar not null, p_gender int not null, p_birthday varchar not null, p_creationdate bigint not null, p_locationip varchar not null, p_browserused int not null, p_placeid bigint );",
-    "create table place (pl_placeid bigint not null, id bigint not null, vid varchar, pl_name varchar not null, pl_url varchar not null, pl_type int not null, pl_containerplaceid bigint );",
-    "create table tagclass (tc_tagclassid bigint not null, id bigint not null, vid varchar, tc_name varchar not null, tc_url varchar not null, tc_subclassoftagclassid bigint );",
-    "create table tag (t_tagid bigint not null, id bigint not null, vid varchar, t_name varchar not null, t_url varchar not null, t_tagclassid bigint not null );",
+    "create table comment (c_id bigint primary key, id bigint not null, vid varchar, c_creationdate bigint not null, c_locationip varchar not null, c_browserused int not null, c_content text not null, c_length int not null, c_creatorid bigint, c_locationid bigint, c_replyof_post bigint, c_replyof_comment bigint );",
+    "create table post (ps_id bigint primary key, id bigint not null, vid varchar, ps_imagefile varchar, ps_creationdate bigint not null, ps_locationip varchar not null, ps_browserused int not null, ps_language varchar, ps_content text, ps_length int not null, ps_creatorid bigint, ps_forumid bigint, ps_locationid bigint );",
+    "create table forum (f_forumid bigint primary key, id bigint not null, vid varchar, f_title varchar not null, f_creationdate bigint not null, f_moderatorid bigint );",
+    "create table organisation (o_organisationid bigint primary key, id bigint not null, vid varchar, o_type int not null, o_name varchar not null, o_url varchar not null, o_placeid bigint );",
+    "create table person (p_personid bigint primary key, id bigint not null, vid varchar, p_firstname varchar not null, p_lastname varchar not null, p_gender int not null, p_birthday varchar not null, p_creationdate bigint not null, p_locationip varchar not null, p_browserused int not null, p_placeid bigint );",
+    "create table place (pl_placeid bigint primary key, id bigint not null, vid varchar, pl_name varchar not null, pl_url varchar not null, pl_type int not null, pl_containerplaceid bigint );",
+    "create table tagclass (tc_tagclassid bigint primary key, id bigint not null, vid varchar, tc_name varchar not null, tc_url varchar not null, tc_subclassoftagclassid bigint );",
+    "create table tag (t_tagid bigint primary key, id bigint not null, vid varchar, t_name varchar not null, t_url varchar not null, t_tagclassid bigint not null );",
     "create table forum_person (fp_forumid bigint not null, fp_personid bigint not null, fp_joindate bigint not null );",
     "create table forum_tag (ft_forumid bigint not null, ft_tagid bigint not null );",
     "create table person_tag (pt_personid bigint not null, pt_tagid bigint not null );",
@@ -173,8 +173,6 @@ const int LDBC_MICRO_QUERIES_COUNT = 38;
     result += write_dir(ldbc_light_queries_sf10, "LDBC_LIGHT_QUERIES_SF10")
     result += write_dir(ldbc_light_queries_sf30, "LDBC_LIGHT_QUERIES_SF30")
     result += write_dir(ldbc_answers_sf1, "LDBC_ANSWERS_SF1")
-    result += write_dir(ldbc_answers_sf10, "LDBC_ANSWERS_SF10")
-    result += write_dir(ldbc_answers_sf30, "LDBC_ANSWERS_SF30")
 
     with open(ldbc_header, 'w+') as f:
         f.write(result)

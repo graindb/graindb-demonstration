@@ -24,7 +24,7 @@ enum QueryNodeType : uint8_t {
 
 class QueryNode {
 public:
-	QueryNode(QueryNodeType type) : type(type) {
+	explicit QueryNode(QueryNodeType type) : type(type) {
 	}
 	virtual ~QueryNode() {
 	}

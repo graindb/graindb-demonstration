@@ -1,9 +1,8 @@
-#include "duckdb/function/table/sqlite_functions.hpp"
-
 #include "duckdb/catalog/catalog.hpp"
 #include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/view_catalog_entry.hpp"
 #include "duckdb/common/exception.hpp"
+#include "duckdb/function/table/sqlite_functions.hpp"
 #include "duckdb/storage/data_table.hpp"
 
 #include <algorithm>
@@ -22,38 +21,29 @@ struct PragmaTableFunctionData : public TableFunctionData {
 
 static unique_ptr<FunctionData> pragma_table_info_bind(ClientContext &context, vector<Value> inputs,
                                                        vector<SQLType> &return_types, vector<string> &names) {
-	names.push_back("cid");
+	names.emplace_back("cid");
 	return_types.push_back(SQLType::INTEGER);
 
-	names.push_back("name");
+	names.emplace_back("name");
 	return_types.push_back(SQLType::VARCHAR);
 
-	names.push_back("type");
+	names.emplace_back("type");
 	return_types.push_back(SQLType::VARCHAR);
 
-	names.push_back("notnull");
+	names.emplace_back("notnull");
 	return_types.push_back(SQLType::BOOLEAN);
 
-	names.push_back("dflt_value");
+	names.emplace_back("dflt_value");
 	return_types.push_back(SQLType::VARCHAR);
 
-	names.push_back("pk");
+	names.emplace_back("pk");
 	return_types.push_back(SQLType::BOOLEAN);
 
 	return make_unique<PragmaTableFunctionData>();
 }
 
-static string pragma_table_info_edges(TableCatalogEntry *table) {
-	return table->storage->GetRAIsInfo();
-}
-
 static void pragma_table_info_table(PragmaTableFunctionData &data, TableCatalogEntry *table, DataChunk &output) {
-	bool if_edge_exists = false;
 	unsigned long table_size = table->columns.size();
-	if (pragma_table_info_edges(table) != "false") {
-		if_edge_exists = true;
-		table_size += 1;
-	}
 	if (data.offset >= table_size) {
 		// finished returning value
 		return;
@@ -62,44 +52,25 @@ static void pragma_table_info_table(PragmaTableFunctionData &data, TableCatalogE
 	// either fill up the chunk or return all the remaining columns
 	idx_t next = min(data.offset + STANDARD_VECTOR_SIZE, (idx_t)table_size);
 	output.SetCardinality(next - data.offset);
-	int32_t describe_oid = 0;
 	for (idx_t i = data.offset; i < next; i++) {
 		auto index = i - data.offset;
 		// return values:
-		// "cid", TypeId::INT32
-		if (if_edge_exists && (idx_t)table_size - data.offset < STANDARD_VECTOR_SIZE && index == next - 1) {
-			describe_oid = table->columns[i - 1].oid + 1;
-			output.SetValue(0, index, Value::INTEGER(describe_oid));
-			// "name", TypeId::VARCHAR
-			output.SetValue(1, index, Value("Edges:"));
-			// "type", TypeId::VARCHAR
-			output.SetValue(2, index, Value(pragma_table_info_edges(table)));
-			// "notnull", TypeId::BOOL
-			// FIXME: look at constraints
-			output.SetValue(3, index, Value::BOOLEAN(false));
-			// "dflt_value", TypeId::VARCHAR
-			output.SetValue(4, index, Value(" "));
-			// "pk", TypeId::BOOL
-			// FIXME: look at constraints
-			output.SetValue(5, index, Value::BOOLEAN(false));
-		} else {
-			auto &column = table->columns[i];
-			assert(column.oid < (idx_t)std::numeric_limits<int32_t>::max());
-			output.SetValue(0, index, Value::INTEGER((int32_t)column.oid));
-			// "name", TypeId::VARCHAR
-			output.SetValue(1, index, Value(column.name));
-			// "type", TypeId::VARCHAR
-			output.SetValue(2, index, Value(SQLTypeToString(column.type)));
-			// "notnull", TypeId::BOOL
-			// FIXME: look at constraints
-			output.SetValue(3, index, Value::BOOLEAN(false));
-			// "dflt_value", TypeId::VARCHAR
-			Value def_value = column.default_value ? Value(column.default_value->ToString()) : Value();
-			output.SetValue(4, index, def_value);
-			// "pk", TypeId::BOOL
-			// FIXME: look at constraints
-			output.SetValue(5, index, Value::BOOLEAN(false));
-		}
+		auto &column = table->columns[i];
+		assert(column.oid < (idx_t)std::numeric_limits<int32_t>::max());
+		output.SetValue(0, index, Value::INTEGER((int32_t)column.oid));
+		// "name", TypeId::VARCHAR
+		output.SetValue(1, index, Value(column.name));
+		// "type", TypeId::VARCHAR
+		output.SetValue(2, index, Value(SQLTypeToString(column.type)));
+		// "notnull", TypeId::BOOL
+		// FIXME: look at constraints
+		output.SetValue(3, index, Value::BOOLEAN(false));
+		// "dflt_value", TypeId::VARCHAR
+		Value def_value = column.default_value ? Value(column.default_value->ToString()) : Value();
+		output.SetValue(4, index, def_value);
+		// "pk", TypeId::BOOL
+		// FIXME: look at constraints
+		output.SetValue(5, index, Value::BOOLEAN(false));
 	}
 	data.offset = next;
 }

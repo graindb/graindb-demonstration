@@ -16,7 +16,8 @@ namespace duckdb {
 
 class RecursiveCTENode : public QueryNode {
 public:
-	RecursiveCTENode() : QueryNode(QueryNodeType::RECURSIVE_CTE_NODE) {
+	RecursiveCTENode()
+	    : QueryNode(QueryNodeType::RECURSIVE_CTE_NODE), union_all(true), min_hop(1), max_hop(UINT64_MAX) {
 	}
 
 	string ctename;
@@ -25,6 +26,8 @@ public:
 	unique_ptr<QueryNode> left;
 	//! The right side of the set operation
 	unique_ptr<QueryNode> right;
+
+	idx_t min_hop, max_hop;
 
 	const vector<unique_ptr<ParsedExpression>> &GetSelectList() const override {
 		return left->GetSelectList();

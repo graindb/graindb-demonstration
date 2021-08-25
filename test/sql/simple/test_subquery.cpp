@@ -159,7 +159,7 @@ TEST_CASE("Joins in subqueries", "[subqueries]") {
 	REQUIRE_NO_FAIL(con.Query("INSERT INTO test2 VALUES (1, 44)"));
 	REQUIRE_NO_FAIL(con.Query("INSERT INTO test2 VALUES (2, 42)"));
 
-	result = con.Query("SELECT * FROM test, test2 WHERE test.id=test2.id AND "
+	result = con.Query("SELECT test.id, test_value, test2.id, test2_value FROM test, test2 WHERE test.id=test2.id AND "
 	                   "test_value*test2_value=(SELECT MIN(test_value*test2_value) FROM test "
 	                   "AS a, test2 WHERE a.id=test.id AND a.id=test2.id)");
 	REQUIRE(CHECK_COLUMN(result, 0, {1, 2}));

@@ -20,7 +20,7 @@ string LogicalGet::ParamsToString() const {
 		return "";
 	}
 	string result = "[" + table->name + "<" + to_string(table_index) + ">" + " (";
-	if (column_ids.size() > 0) {
+	if (!column_ids.empty()) {
 		result += StringUtil::Join(column_ids, column_ids.size(), ", ", [&](const idx_t cid) {
 			if (cid == COLUMN_IDENTIFIER_ROW_ID) {
 				return "rowid";
@@ -35,12 +35,12 @@ vector<ColumnBinding> LogicalGet::GetColumnBindings() {
 	if (!table) {
 		return {ColumnBinding(INVALID_INDEX, 0)};
 	}
-	if (column_ids.size() == 0) {
+	if (column_ids.empty()) {
 		return {ColumnBinding(table_index, 0)};
 	}
 	vector<ColumnBinding> result;
 	for (idx_t i = 0; i < column_ids.size(); i++) {
-		result.push_back(ColumnBinding(table_index, i));
+		result.emplace_back(table_index, i);
 	}
 	return result;
 }
@@ -48,7 +48,7 @@ vector<ColumnBinding> LogicalGet::GetColumnBindings() {
 ColumnBinding LogicalGet::PushdownColumnBinding(ColumnBinding &binding) {
 	column_t referenced_rai = binding.column_index == COLUMN_IDENTIFIER_ROW_ID
 	                              ? COLUMN_IDENTIFIER_ROW_ID
-	                              : table->columns[binding.column_index].rai_oid;
+	                              : table->columns[binding.column_index].join_index_oid;
 	auto entry = find(column_ids.begin(), column_ids.end(), referenced_rai);
 	if (entry != column_ids.end()) {
 		auto column_idx = distance(column_ids.begin(), entry);
@@ -60,7 +60,7 @@ ColumnBinding LogicalGet::PushdownColumnBinding(ColumnBinding &binding) {
 }
 
 void LogicalGet::ResolveTypes() {
-	if (column_ids.size() == 0) {
+	if (column_ids.empty()) {
 		column_ids.push_back(COLUMN_IDENTIFIER_ROW_ID);
 	}
 	types = table->GetTypes(column_ids);

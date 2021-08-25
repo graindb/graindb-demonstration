@@ -1,8 +1,8 @@
 #include "duckdb/execution/operator/join/physical_sip_join.hpp"
 
 #include "duckdb/common/vector_operations/vector_operations.hpp"
+#include "duckdb/execution/index/rai/rel_adj_index.hpp"
 #include "duckdb/storage/buffer_manager.hpp"
-#include "duckdb/storage/rai.hpp"
 #include "duckdb/storage/storage_manager.hpp"
 
 #include <iostream>
@@ -19,7 +19,7 @@ public:
 	bool initialized;
 	DataChunk cached_chunk;
 	DataChunk join_keys;
-	// state for SHJoin
+	// state for SIPJoin
 	unique_ptr<SIPHashTable::SIPScanStructure> scan_structure;
 };
 
@@ -31,7 +31,7 @@ PhysicalSIPJoin::PhysicalSIPJoin(ClientContext &context, LogicalOperator &op, un
 	children.push_back(move(left));
 	children.push_back(move(right));
 
-	assert(left_projection_map.size() == 0);
+	assert(left_projection_map.empty());
 
 	hash_table =
 	    make_unique<SIPHashTable>(BufferManager::GetBufferManager(context), conditions,
@@ -39,25 +39,21 @@ PhysicalSIPJoin::PhysicalSIPJoin(ClientContext &context, LogicalOperator &op, un
 }
 
 void PhysicalSIPJoin::InitializeAList() {
-	auto &rai_info = conditions[0].rais[0];
+	auto &rai_info = conditions[0].rai_info;
 	// determine the alist for usage
-	switch (rai_info->rai_type) {
-	case RAIType::SELF:
-	case RAIType::EDGE_SOURCE: {
-		rai_info->compact_list = rai_info->forward ? &rai_info->rai->alist->compact_forward_list
-		                                           : &rai_info->rai->alist->compact_backward_list;
+	switch (rai_info->rai_lr_info) {
+	case RAILRInfo::SELF:
+	case RAILRInfo::EDGE_SOURCE: {
+		rai_info->alists = rai_info->forward ? rai_info->rai->GetALists(EdgeDirection::FORWARD)
+		                                     : rai_info->rai->GetALists(EdgeDirection::BACKWARD);
 		break;
 	}
-	case RAIType::EDGE_TARGET: {
-		if (rai_info->rai->rai_direction == RAIDirection::UNDIRECTED) {
-			rai_info->compact_list = &rai_info->rai->alist->compact_backward_list;
-		} else {
-			rai_info->compact_list = nullptr;
-		}
+	case RAILRInfo::EDGE_DEST: {
+		rai_info->alists = rai_info->rai->GetALists(EdgeDirection::BACKWARD);
 		break;
 	}
 	default:
-		rai_info->compact_list = nullptr;
+		rai_info->alists = nullptr;
 		break;
 	}
 }
@@ -141,12 +137,8 @@ void PhysicalSIPJoin::ProbeHashTable(ClientContext &context, DataChunk &chunk, P
 
 void PhysicalSIPJoin::PassBitMaskFilter() {
 	// actually do the pushdown
-	auto &rai_info = conditions[0].rais[0];
-	children[0]->PushdownZoneFilter(rai_info->passing_tables[0], rai_info->row_bitmask, rai_info->zone_bitmask);
-	if (rai_info->passing_tables[1] != 0) {
-		children[0]->PushdownZoneFilter(rai_info->passing_tables[1], rai_info->extra_row_bitmask,
-		                                rai_info->extra_zone_bitmask);
-	}
+	auto &rai_info = conditions[0].rai_info;
+	children[0]->PushdownZoneFilter(rai_info->passing_table, rai_info->row_bitmask, rai_info->zone_bitmask);
 }
 
 void PhysicalSIPJoin::PerformSHJoin(ClientContext &context, DataChunk &chunk, PhysicalOperatorState *state_) {
@@ -195,12 +187,14 @@ void PhysicalSIPJoin::GetChunkInternal(ClientContext &context, DataChunk &chunk,
 		DataChunk right_chunk, build_chunk;
 		right_chunk.Initialize(right_types);
 
-		if (right_projection_map.size() > 0) {
+		if (!right_projection_map.empty()) {
 			build_chunk.InitializeEmpty(hash_table->build_types);
 		}
 
 		state->join_keys.InitializeEmpty(hash_table->condition_types);
-		auto rai_info = conditions[0].rais[0].get();
+		// initialize alist pointer
+		InitializeAList();
+		auto &rai_info = conditions[0].rai_info;
 		// append ht blocks
 		while (true) {
 			children[1]->GetChunk(context, right_chunk, right_state.get());
@@ -208,7 +202,7 @@ void PhysicalSIPJoin::GetChunkInternal(ClientContext &context, DataChunk &chunk,
 				break;
 			}
 			state->rhs_executor.Execute(right_chunk, state->join_keys);
-			if (right_projection_map.size() > 0) {
+			if (!right_projection_map.empty()) {
 				build_chunk.Reset();
 				build_chunk.SetCardinality(right_chunk);
 				for (idx_t i = 0; i < right_projection_map.size(); i++) {
@@ -229,14 +223,14 @@ void PhysicalSIPJoin::GetChunkInternal(ClientContext &context, DataChunk &chunk,
 		}
 
 		// estimate semi-join filter passing ratio
-		double avg_degree = rai_info->GetAverageDegree(rai_info->rai_type, rai_info->forward);
-		auto probe_table_card = (double)rai_info->left_cardinalities[0];
-		auto filter_passing_ratio = non_empty_hash_slots * avg_degree / probe_table_card;
-		if (filter_passing_ratio <= SIPJoin::SHJ_MAGIC) {
-			// if passing ratio is low, generate and pass semi-join filter
-			hash_table->GenerateBitmaskFilter(*rai_info, rai_info->compact_list != nullptr);
-			PassBitMaskFilter();
-		}
+		// double avg_degree = rai_info->GetAverageDegree(rai_info->rai_lr_info, rai_info->forward);
+		// auto probe_table_card = (double)rai_info->cardinality;
+		// auto filter_passing_ratio = non_empty_hash_slots * avg_degree / probe_table_card;
+		// if (filter_passing_ratio <= SIPJoin::SHJ_MAGIC) {
+		// if passing ratio is low, generate and pass semi-join filter
+		hash_table->GenerateBitmaskFilter(*rai_info, rai_info->alists != nullptr);
+		PassBitMaskFilter();
+		// }
 		state->initialized = true;
 
 		if (hash_table->size() == 0 &&
@@ -251,22 +245,24 @@ void PhysicalSIPJoin::GetChunkInternal(ClientContext &context, DataChunk &chunk,
 }
 
 unique_ptr<PhysicalOperatorState> PhysicalSIPJoin::GetOperatorState() {
+	hash_table =
+	    make_unique<SIPHashTable>(hash_table->buffer_manager, conditions,
+	                              LogicalOperator::MapTypes(children[1]->GetTypes(), right_projection_map), type);
 	return make_unique<PhysicalSIPJoinState>(children[0].get(), children[1].get(), conditions);
 }
 
 string PhysicalSIPJoin::ExtraRenderInformation() const {
 	string extra_info;
-	extra_info = "SIP_JOIN[";
+	extra_info = "SJ[";
 	extra_info += JoinTypeToString(type);
 	extra_info += ", build: ";
 	extra_info +=
-	    to_string(right_projection_map.size() == 0 ? children[1]->GetTypes().size() : right_projection_map.size());
+	    to_string(right_projection_map.empty() ? children[1]->GetTypes().size() : right_projection_map.size());
 	extra_info += "]\n";
 	for (auto &it : conditions) {
 		string op = ExpressionTypeToOperator(it.comparison);
 		extra_info += it.left->GetName() + op + it.right->GetName() + "\n";
 	}
-	auto &rai_info = conditions[0].rais[0];
-	extra_info += rai_info->ToString() + "\n";
+	extra_info += conditions[0].rai_info->ToString() + "\n";
 	return extra_info;
 }

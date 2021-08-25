@@ -136,7 +136,7 @@ void RemoveUnusedColumns::VisitOperator(LogicalOperator &op) {
 			// table scan: figure out which columns are referenced
 			ClearUnusedExpressions(get.column_ids, get.table_index);
 
-			if (get.column_ids.size() == 0) {
+			if (get.column_ids.empty()) {
 				// this generally means we are only interested in whether or not anything exists in the table (e.g.
 				// EXISTS(SELECT * FROM tbl)) in this case, we just scan the row identifier column as it means we do not
 				// need to read any of the columns

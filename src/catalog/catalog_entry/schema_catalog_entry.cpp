@@ -1,19 +1,21 @@
 #include "duckdb/catalog/catalog_entry/schema_catalog_entry.hpp"
 
 #include "duckdb/catalog/catalog.hpp"
-#include "duckdb/catalog/catalog_entry/index_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/aggregate_function_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/collate_catalog_entry.hpp"
+#include "duckdb/catalog/catalog_entry/edge_catalog_entry.hpp"
+#include "duckdb/catalog/catalog_entry/index_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/scalar_function_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/sequence_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp"
+#include "duckdb/catalog/catalog_entry/vertex_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/view_catalog_entry.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/parser/parsed_data/alter_table_info.hpp"
+#include "duckdb/parser/parsed_data/create_collation_info.hpp"
 #include "duckdb/parser/parsed_data/create_index_info.hpp"
 #include "duckdb/parser/parsed_data/create_scalar_function_info.hpp"
-#include "duckdb/parser/parsed_data/create_collation_info.hpp"
 #include "duckdb/parser/parsed_data/create_schema_info.hpp"
 #include "duckdb/parser/parsed_data/create_sequence_info.hpp"
 #include "duckdb/parser/parsed_data/create_table_function_info.hpp"
@@ -28,8 +30,8 @@ using namespace duckdb;
 using namespace std;
 
 SchemaCatalogEntry::SchemaCatalogEntry(Catalog *catalog, string name)
-    : CatalogEntry(CatalogType::SCHEMA, catalog, name), tables(*catalog), indexes(*catalog), table_functions(*catalog),
-      functions(*catalog), sequences(*catalog), collations(*catalog) {
+    : CatalogEntry(CatalogType::SCHEMA, catalog, move(name)), tables(*catalog), vertices(*catalog), edges(*catalog),
+      indexes(*catalog), table_functions(*catalog), functions(*catalog), sequences(*catalog), collations(*catalog) {
 }
 
 CatalogEntry *SchemaCatalogEntry::AddEntry(ClientContext &context, unique_ptr<StandardEntry> entry,
@@ -86,6 +88,16 @@ CatalogEntry *SchemaCatalogEntry::CreateSequence(ClientContext &context, CreateS
 CatalogEntry *SchemaCatalogEntry::CreateTable(ClientContext &context, BoundCreateTableInfo *info) {
 	auto table = make_unique<TableCatalogEntry>(catalog, this, info);
 	return AddEntry(context, move(table), info->Base().on_conflict, info->dependencies);
+}
+
+CatalogEntry *SchemaCatalogEntry::CreateVertex(ClientContext &context, BoundCreateVertexInfo *info) {
+	auto vertex = make_unique<VertexCatalogEntry>(catalog, this, info);
+	return AddEntry(context, move(vertex), OnCreateConflict::ERROR);
+}
+
+CatalogEntry *SchemaCatalogEntry::CreateEdge(ClientContext &context, BoundCreateEdgeInfo *info) {
+	auto edge = make_unique<EdgeCatalogEntry>(catalog, this, info, info->edge_direction);
+	return AddEntry(context, move(edge), OnCreateConflict::ERROR);
 }
 
 CatalogEntry *SchemaCatalogEntry::CreateView(ClientContext &context, CreateViewInfo *info) {
@@ -209,6 +221,10 @@ CatalogSet &SchemaCatalogEntry::GetCatalogSet(CatalogType type) {
 	case CatalogType::VIEW:
 	case CatalogType::TABLE:
 		return tables;
+	case CatalogType::VERTEX:
+		return vertices;
+	case CatalogType::EDGE:
+		return edges;
 	case CatalogType::INDEX:
 		return indexes;
 	case CatalogType::TABLE_FUNCTION:

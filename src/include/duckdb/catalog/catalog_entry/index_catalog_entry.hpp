@@ -23,7 +23,7 @@ public:
 	IndexCatalogEntry(Catalog *catalog, SchemaCatalogEntry *schema, CreateIndexInfo *info)
 	    : StandardEntry(CatalogType::INDEX, schema, catalog, info->index_name), index(nullptr) {
 	}
-	~IndexCatalogEntry();
+	~IndexCatalogEntry() override;
 
 	Index *index;
 	shared_ptr<DataTableInfo> info;

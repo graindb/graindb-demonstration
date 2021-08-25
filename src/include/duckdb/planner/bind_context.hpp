@@ -11,6 +11,7 @@
 #include "duckdb/catalog/catalog.hpp"
 #include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp"
+#include "duckdb/catalog/catalog_entry/vertex_catalog_entry.hpp"
 #include "duckdb/common/unordered_map.hpp"
 #include "duckdb/common/unordered_set.hpp"
 #include "duckdb/parser/expression/columnref_expression.hpp"
@@ -42,7 +43,8 @@ public:
 	//! Generate column expressions for all columns that are present in the
 	//! referenced tables. This is used to resolve the * expression in a
 	//! selection list.
-	void GenerateAllColumnExpressions(vector<unique_ptr<ParsedExpression>> &new_select_list, string relation_name = "");
+	void GenerateAllColumnExpressions(vector<unique_ptr<ParsedExpression>> &new_select_list,
+	                                  const string &relation_name = "");
 
 	//! Adds a base table with the given alias to the BindContext.
 	void AddBaseTable(idx_t index, const string &alias, TableCatalogEntry &table, LogicalGet &get);
@@ -50,6 +52,24 @@ public:
 	void AddSubquery(idx_t index, const string &alias, SubqueryRef &ref, BoundQueryNode &subquery);
 	//! Adds a base table with the given alias to the BindContext.
 	void AddGenericBinding(idx_t index, const string &alias, vector<string> names, vector<SQLType> types);
+
+	void AddVertex(idx_t index, const string &alias, VertexCatalogEntry &vertex, LogicalGet &get);
+
+	TableBinding *GetBaseTable(const string &alias) {
+		if (bindings.find(alias) != bindings.end()) {
+			return reinterpret_cast<TableBinding *>(bindings[alias].get());
+		} else {
+			return nullptr;
+		}
+	}
+
+	VertexBinding *GetVertex(const string &alias) {
+		if (vertex_bindings.find(alias) != vertex_bindings.end()) {
+			return vertex_bindings[alias].get();
+		} else {
+			return nullptr;
+		}
+	}
 
 	//! Adds a base table with the given alias to the CTE BindContext.
 	//! We need this to correctly bind recursive CTEs with multiple references.
@@ -75,6 +95,9 @@ private:
 	unordered_map<string, unique_ptr<Binding>> bindings;
 	//! The list of bindings in insertion order
 	vector<std::pair<string, Binding *>> bindings_list;
+
+	//! The set of vertices
+	unordered_map<string, unique_ptr<VertexBinding>> vertex_bindings;
 
 	//! The set of CTE bindings
 	unordered_map<string, std::shared_ptr<Binding>> cte_bindings;

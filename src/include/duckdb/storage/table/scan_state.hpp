@@ -23,10 +23,9 @@ class TransientSegment;
 struct IndexScanState {
 	vector<column_t> column_ids;
 
-	IndexScanState(vector<column_t> column_ids) : column_ids(column_ids) {
+	explicit IndexScanState(vector<column_t> column_ids) : column_ids(move(column_ids)) {
 	}
-	virtual ~IndexScanState() {
-	}
+	virtual ~IndexScanState() = default;
 };
 
 typedef unordered_map<block_id_t, unique_ptr<BufferHandle>> buffer_handle_set_t;
@@ -75,7 +74,7 @@ public:
 	idx_t offset = 0;
 	vector<column_t> column_ids;
 	LocalScanState local_state;
-	shared_ptr<rows_vector> rowids;
+	shared_ptr<vector<row_t>> rowids;
 	shared_ptr<bitmask_vector> zones;
 	shared_ptr<bitmask_vector> zones_sel;
 	idx_t rows_offset = 0;

@@ -11,14 +11,14 @@
 #include "duckdb/parser/parsed_data/create_table_info.hpp"
 #include "duckdb/planner/bound_constraint.hpp"
 #include "duckdb/planner/expression.hpp"
-#include "duckdb/storage/table/persistent_segment.hpp"
 #include "duckdb/planner/logical_operator.hpp"
+#include "duckdb/storage/table/persistent_segment.hpp"
 
 namespace duckdb {
 class CatalogEntry;
 
 struct BoundCreateTableInfo {
-	BoundCreateTableInfo(unique_ptr<CreateInfo> base) : base(move(base)) {
+	explicit BoundCreateTableInfo(unique_ptr<CreateInfo> base) : schema(nullptr), base(move(base)) {
 	}
 
 	//! The schema to create the table in
@@ -40,7 +40,7 @@ struct BoundCreateTableInfo {
 	//! CREATE TABLE from QUERY
 	unique_ptr<LogicalOperator> query;
 
-	CreateTableInfo &Base() {
+	CreateTableInfo &Base() const {
 		return (CreateTableInfo &)*base;
 	}
 };

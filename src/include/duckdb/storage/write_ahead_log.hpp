@@ -8,11 +8,11 @@
 
 #pragma once
 
-#include "duckdb/common/helper.hpp"
-#include "duckdb/common/types/data_chunk.hpp"
-#include "duckdb/common/enums/wal_type.hpp"
-#include "duckdb/common/serializer/buffered_file_writer.hpp"
 #include "duckdb/catalog/catalog_entry/sequence_catalog_entry.hpp"
+#include "duckdb/common/enums/wal_type.hpp"
+#include "duckdb/common/helper.hpp"
+#include "duckdb/common/serializer/buffered_file_writer.hpp"
+#include "duckdb/common/types/data_chunk.hpp"
 
 namespace duckdb {
 
@@ -25,6 +25,8 @@ class SchemaCatalogEntry;
 class SequenceCatalogEntry;
 class ViewCatalogEntry;
 class TableCatalogEntry;
+class VertexCatalogEntry;
+class EdgeCatalogEntry;
 class Transaction;
 class TransactionManager;
 
@@ -50,6 +52,10 @@ public:
 
 	void WriteCreateTable(TableCatalogEntry *entry);
 	void WriteDropTable(TableCatalogEntry *entry);
+
+	void WriteCreateEdge(EdgeCatalogEntry *entry);
+
+	void WriteCreateVertex(VertexCatalogEntry *entry);
 
 	void WriteCreateSchema(SchemaCatalogEntry *entry);
 	void WriteDropSchema(SchemaCatalogEntry *entry);

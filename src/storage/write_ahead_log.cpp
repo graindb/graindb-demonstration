@@ -1,10 +1,12 @@
 #include "duckdb/storage/write_ahead_log.hpp"
-#include "duckdb/main/database.hpp"
+
+#include "duckdb/catalog/catalog_entry/edge_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/schema_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
+#include "duckdb/catalog/catalog_entry/vertex_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/view_catalog_entry.hpp"
+#include "duckdb/main/database.hpp"
 #include "duckdb/parser/parsed_data/alter_table_info.hpp"
-#include <cstring>
 
 using namespace duckdb;
 using namespace std;
@@ -42,6 +44,22 @@ void WriteAheadLog::WriteDropTable(TableCatalogEntry *entry) {
 	writer->Write<WALType>(WALType::DROP_TABLE);
 	writer->WriteString(entry->schema->name);
 	writer->WriteString(entry->name);
+}
+
+//===--------------------------------------------------------------------===//
+// CREATE EDGE
+//===--------------------------------------------------------------------===//
+void WriteAheadLog::WriteCreateEdge(EdgeCatalogEntry *entry) {
+	writer->Write<WALType>(WALType::CREATE_EDGE);
+	entry->Serialize(*writer);
+}
+
+//===--------------------------------------------------------------------===//
+// CREATE VERTEX
+//===--------------------------------------------------------------------===//
+void WriteAheadLog::WriteCreateVertex(VertexCatalogEntry *entry) {
+	writer->Write<WALType>(WALType::CREATE_VERTEX);
+	entry->Serialize(*writer);
 }
 
 //===--------------------------------------------------------------------===//

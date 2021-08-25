@@ -1,10 +1,12 @@
+#include "duckdb/catalog/catalog_entry/edge_catalog_entry.hpp"
+#include "duckdb/catalog/catalog_entry/schema_catalog_entry.hpp"
+#include "duckdb/parser/expression/columnref_expression.hpp"
+#include "duckdb/parser/expression/comparison_expression.hpp"
+#include "duckdb/parser/expression/conjunction_expression.hpp"
 #include "duckdb/parser/tableref/joinref.hpp"
 #include "duckdb/planner/binder.hpp"
 #include "duckdb/planner/expression_binder/where_binder.hpp"
 #include "duckdb/planner/tableref/bound_joinref.hpp"
-#include "duckdb/parser/expression/columnref_expression.hpp"
-#include "duckdb/parser/expression/comparison_expression.hpp"
-#include "duckdb/parser/expression/conjunction_expression.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -12,7 +14,7 @@ using namespace std;
 unique_ptr<BoundTableRef> Binder::Bind(JoinRef &ref) {
 	auto result = make_unique<BoundJoinRef>();
 	result->type = ref.type;
-	if (ref.using_columns.size() > 0) {
+	if (!ref.using_columns.empty()) {
 		// USING columns
 		assert(!result->condition);
 		vector<string> left_join_bindings;
@@ -22,7 +24,7 @@ unique_ptr<BoundTableRef> Binder::Bind(JoinRef &ref) {
 		for (auto &using_column : ref.using_columns) {
 			// for each using column, get the matching binding
 			auto left_bindings = bind_context.GetMatchingBindings(using_column);
-			if (left_bindings.size() == 0) {
+			if (left_bindings.empty()) {
 				throw BinderException("Column \"%s\" does not exist on left side of join!", using_column.c_str());
 			}
 			// find the join binding
@@ -32,8 +34,8 @@ unique_ptr<BoundTableRef> Binder::Bind(JoinRef &ref) {
 					if (!left_binding.empty()) {
 						string error = "Column name \"" + using_column +
 						               "\" is ambiguous: it exists more than once on left side of join.\nCandidates:";
-						for (auto &binding : left_bindings) {
-							error += "\n\t" + binding + "." + using_column;
+						for (auto &l_binding : left_bindings) {
+							error += "\n\t" + l_binding + "." + using_column;
 						}
 						throw BinderException(error);
 					} else {

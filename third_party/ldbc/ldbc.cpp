@@ -141,7 +141,7 @@ std::string ldbc::get_query(int query, int sf) {
 	case 10:
 		return LDBC_QUERIES_SF10[query - 1];
 	case 30:
-		return LDBC_ANSWERS_SF30[query - 1];
+		return LDBC_QUERIES_SF30[query - 1];
 	default:
 		return "";
 	}

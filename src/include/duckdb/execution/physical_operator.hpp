@@ -28,8 +28,15 @@ class PhysicalOperator;
 //! data source is exhausted.
 class PhysicalOperatorState {
 public:
-	PhysicalOperatorState(PhysicalOperator *child);
+	explicit PhysicalOperatorState(PhysicalOperator *child);
 	virtual ~PhysicalOperatorState() = default;
+
+	virtual void Reset() {
+		if (child_state) {
+			child_state->Reset();
+		}
+		finished = false;
+	}
 
 	//! Flag indicating whether or not the operator is finished [note: not all
 	//! operators use this flag]
@@ -51,10 +58,9 @@ public:
 */
 class PhysicalOperator {
 public:
-	PhysicalOperator(PhysicalOperatorType type, vector<TypeId> types) : type(type), types(types) {
+	PhysicalOperator(PhysicalOperatorType type, vector<TypeId> types) : type(type), types(move(types)) {
 	}
-	virtual ~PhysicalOperator() {
-	}
+	virtual ~PhysicalOperator() = default;
 
 	//! The physical operator type
 	PhysicalOperatorType type;
@@ -66,7 +72,7 @@ public:
 public:
 	string ToString(idx_t depth = 0) const;
 	string ToJSON() const;
-	void Print();
+	void Print() const;
 
 	//! Return a vector of the types that will be returned by this operator
 	vector<TypeId> &GetTypes() {
@@ -113,7 +119,7 @@ public:
 
 	//! Create a new empty instance of the operator state
 	virtual unique_ptr<PhysicalOperatorState> GetOperatorState() {
-		return make_unique<PhysicalOperatorState>(children.size() == 0 ? nullptr : children[0].get());
+		return make_unique<PhysicalOperatorState>(children.empty() ? nullptr : children[0].get());
 	}
 
 	virtual string ExtraRenderInformation() const {

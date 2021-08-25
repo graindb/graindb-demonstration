@@ -8,15 +8,16 @@
 
 #pragma once
 
-#include "duckdb/catalog/catalog_set.hpp"
 #include "duckdb/catalog/catalog_entry/schema_catalog_entry.hpp"
+#include "duckdb/catalog/catalog_set.hpp"
+#include "duckdb/common/unordered_set.hpp"
 #include "duckdb/execution/execution_context.hpp"
+#include "duckdb/main/prepared_statement.hpp"
 #include "duckdb/main/query_profiler.hpp"
 #include "duckdb/main/stream_query_result.hpp"
-#include "duckdb/main/prepared_statement.hpp"
 #include "duckdb/main/table_description.hpp"
 #include "duckdb/transaction/transaction_context.hpp"
-#include "duckdb/common/unordered_set.hpp"
+
 #include <random>
 
 namespace duckdb {
@@ -79,7 +80,7 @@ public:
 	//! Issue a query, returning a QueryResult. The QueryResult can be either a StreamQueryResult or a
 	//! MaterializedQueryResult. The StreamQueryResult will only be returned in the case of a successful SELECT
 	//! statement.
-	unique_ptr<QueryResult> Query(string query, bool allow_stream_result);
+	unique_ptr<QueryResult> Query(const string &query, bool allow_stream_result);
 	//! Fetch a query from the current result set (if any)
 	unique_ptr<DataChunk> Fetch();
 	//! Cleanup the result set (if any).
@@ -97,13 +98,13 @@ public:
 	void TryBindRelation(Relation &relation, vector<ColumnDefinition> &result_columns);
 
 	//! Execute a relation
-	unique_ptr<QueryResult> Execute(shared_ptr<Relation> relation);
+	unique_ptr<QueryResult> Execute(const shared_ptr<Relation> &relation);
 
 	//! Prepare a query
-	unique_ptr<PreparedStatement> Prepare(string query);
+	unique_ptr<PreparedStatement> Prepare(const string &query);
 	//! Execute a prepared statement with the given name and set of parameters
 	unique_ptr<QueryResult> Execute(string name, vector<Value> &values, bool allow_stream_result = true,
-	                                string query = string());
+	                                const string &query = string());
 	//! Removes a prepared statement from the set of prepared statements in the client context
 	void RemovePreparedStatement(PreparedStatement *statement);
 
@@ -113,7 +114,7 @@ public:
 private:
 	//! Perform aggressive query verification of a SELECT statement. Only called when query_verification_enabled is
 	//! true.
-	string VerifyQuery(string query, unique_ptr<SQLStatement> statement);
+	string VerifyQuery(const string &query, unique_ptr<SQLStatement> statement);
 
 	void InitialCleanup();
 	//! Internal clean up, does not lock. Caller must hold the context_lock.

@@ -82,7 +82,8 @@ enum class PhysicalOperatorType : uint8_t {
 	// -----------------------------
 	CREATE,
 	CREATE_INDEX,
-	CREATE_RAI,
+	CREATE_VERTEX,
+	CREATE_EDGE,
 	ALTER,
 	CREATE_SEQUENCE,
 	CREATE_VIEW,

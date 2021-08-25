@@ -10,7 +10,7 @@ namespace duckdb {
 
 void PhysicalCreateIndex::GetChunkInternal(ClientContext &context, DataChunk &chunk, PhysicalOperatorState *state,
                                            SelectionVector *sel, Vector *rid_vector, DataChunk *rai_chunk) {
-	if (column_ids.size() == 0) {
+	if (column_ids.empty()) {
 		throw NotImplementedException("CREATE INDEX does not refer to any columns in the base table!");
 	}
 
@@ -28,7 +28,6 @@ void PhysicalCreateIndex::GetChunkInternal(ClientContext &context, DataChunk &ch
 		break;
 	}
 	default:
-		assert(0);
 		throw NotImplementedException("Unimplemented index type");
 	}
 	index_entry->index = index.get();

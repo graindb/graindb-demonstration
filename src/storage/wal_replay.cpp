@@ -1,18 +1,19 @@
-#include "duckdb/storage/write_ahead_log.hpp"
-#include "duckdb/storage/data_table.hpp"
-#include "duckdb/common/serializer/buffered_file_reader.hpp"
-#include "duckdb/catalog/catalog_entry/schema_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
+#include "duckdb/catalog/catalog_entry/vertex_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/view_catalog_entry.hpp"
+#include "duckdb/common/serializer/buffered_file_reader.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/main/database.hpp"
 #include "duckdb/parser/parsed_data/alter_table_info.hpp"
-#include "duckdb/parser/parsed_data/drop_info.hpp"
 #include "duckdb/parser/parsed_data/create_schema_info.hpp"
 #include "duckdb/parser/parsed_data/create_table_info.hpp"
 #include "duckdb/parser/parsed_data/create_view_info.hpp"
+#include "duckdb/parser/parsed_data/drop_info.hpp"
 #include "duckdb/planner/binder.hpp"
 #include "duckdb/planner/parsed_data/bound_create_table_info.hpp"
+#include "duckdb/planner/parsed_data/bound_create_vertex_info.hpp"
+#include "duckdb/storage/data_table.hpp"
+#include "duckdb/storage/write_ahead_log.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -35,6 +36,9 @@ private:
 	void ReplayCreateTable();
 	void ReplayDropTable();
 	void ReplayAlter();
+
+	void ReplayCreateVertex();
+	void ReplayCreateEdge();
 
 	void ReplayCreateView();
 	void ReplayDropView();
@@ -73,7 +77,7 @@ void WriteAheadLog::Replay(DuckDB &database, string &path) {
 	try {
 		while (true) {
 			// read the current entry
-			WALType entry_type = reader.Read<WALType>();
+			auto entry_type = reader.Read<WALType>();
 			if (entry_type == WALType::WAL_FLUSH) {
 				// flush: commit the current transaction
 				context.transaction.Commit();
@@ -105,6 +109,12 @@ void ReplayState::ReplayEntry(WALType entry_type) {
 	switch (entry_type) {
 	case WALType::CREATE_TABLE:
 		ReplayCreateTable();
+		break;
+	case WALType::CREATE_VERTEX:
+		ReplayCreateVertex();
+		break;
+	case WALType::CREATE_EDGE:
+		ReplayCreateEdge();
 		break;
 	case WALType::DROP_TABLE:
 		ReplayDropTable();
@@ -180,6 +190,26 @@ void ReplayState::ReplayAlter() {
 	}
 
 	db.catalog->AlterTable(context, (AlterTableInfo *)info.get());
+}
+
+//===--------------------------------------------------------------------===//
+// Replay Vertex
+//===--------------------------------------------------------------------===//
+void ReplayState::ReplayCreateVertex() {
+	auto info = VertexCatalogEntry::Deserialize(source);
+	Binder binder(context);
+	auto bound_info = binder.BindCreateVertexInfo(move(info));
+	db.catalog->CreateVertex(context, bound_info.get());
+}
+
+//===--------------------------------------------------------------------===//
+// Replay Edge
+//===--------------------------------------------------------------------===//
+void ReplayState::ReplayCreateEdge() {
+	auto info = EdgeCatalogEntry::Deserialize(source);
+	Binder binder(context);
+	auto bound_info = binder.BindCreateEdgeInfo(move(info));
+	db.catalog->CreateEdge(context, bound_info.get());
 }
 
 //===--------------------------------------------------------------------===//
@@ -294,7 +324,7 @@ void ReplayState::ReplayUpdate() {
 		throw Exception("Corrupt WAL: update without table");
 	}
 
-	idx_t column_index = source.Read<column_t>();
+	auto column_index = source.Read<column_t>();
 
 	DataChunk chunk;
 	chunk.Deserialize(source);

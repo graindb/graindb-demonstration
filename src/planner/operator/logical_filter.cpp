@@ -24,7 +24,7 @@ vector<ColumnBinding> LogicalFilter::GetColumnBindings() {
 ColumnBinding LogicalFilter::PushdownColumnBinding(ColumnBinding &binding) {
 	auto child_binding = children[0]->PushdownColumnBinding(binding);
 	if (child_binding.column_index != INVALID_INDEX) {
-		if (projection_map.size() == 0) {
+		if (projection_map.empty()) {
 			return child_binding;
 		}
 		projection_map.push_back(child_binding.column_index);

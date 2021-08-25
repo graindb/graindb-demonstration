@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include "duckdb/planner/bound_query_node.hpp"
-#include "duckdb/planner/logical_operator.hpp"
 #include "duckdb/parser/expression_map.hpp"
+#include "duckdb/planner/bound_query_node.hpp"
 #include "duckdb/planner/bound_tableref.hpp"
+#include "duckdb/planner/logical_operator.hpp"
 
 namespace duckdb {
 
@@ -37,15 +37,15 @@ public:
 	unique_ptr<Expression> having;
 
 	//! The amount of columns in the final result
-	idx_t column_count;
+	idx_t column_count = 0;
 
 	//! Index used by the LogicalProjection
-	idx_t projection_index;
+	idx_t projection_index = 0;
 
 	//! Group index used by the LogicalAggregate (only used if HasAggregation is true)
-	idx_t group_index;
+	idx_t group_index = 0;
 	//! Aggregate index used by the LogicalAggregate (only used if HasAggregation is true)
-	idx_t aggregate_index;
+	idx_t aggregate_index = 0;
 	//! Aggregate functions to compute (only used if HasAggregation is true)
 	vector<unique_ptr<Expression>> aggregates;
 
@@ -53,16 +53,16 @@ public:
 	expression_map_t<idx_t> aggregate_map;
 
 	//! Window index used by the LogicalWindow (only used if HasWindow is true)
-	idx_t window_index;
+	idx_t window_index = 0;
 	//! Window functions to compute (only used if HasWindow is true)
 	vector<unique_ptr<Expression>> windows;
 
-	idx_t unnest_index;
+	idx_t unnest_index = 0;
 	//! Unnest expression
 	vector<unique_ptr<Expression>> unnests;
 
 	//! Index of pruned node
-	idx_t prune_index;
+	idx_t prune_index = 0;
 	bool need_prune = false;
 
 public:

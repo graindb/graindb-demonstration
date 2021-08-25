@@ -56,7 +56,7 @@ static inline unique_ptr<PhysicalOperator> CreateDefaultJoinPlan(ClientContext &
 
 unique_ptr<PhysicalOperator> PhysicalPlanGenerator::CreatePlan(LogicalComparisonJoin &op) {
 	// now visit the children
-	assert((op.op_mark == OpMark::MERGED_SIP_JOIN || op.op_mark == OpMark::ADAPTIVE_MERGE_SIP_JOIN)
+	assert((op.op_hint == OpHint::MSJ || op.op_hint == OpHint::ADAPTIVE_MSJ)
 	           ? op.children.size() == 3
 	           : op.children.size() == 2);
 
@@ -70,19 +70,19 @@ unique_ptr<PhysicalOperator> PhysicalPlanGenerator::CreatePlan(LogicalComparison
 	}
 
 	unique_ptr<PhysicalOperator> plan;
-	switch (op.op_mark) {
-	case OpMark::HASH_JOIN: {
+	switch (op.op_hint) {
+	case OpHint::HJ: {
 		// hash join
 		plan = make_unique<PhysicalHashJoin>(context, op, move(left), move(right), move(op.conditions), op.join_type,
 		                                     op.left_projection_map, op.right_projection_map);
 		break;
 	}
-	case OpMark::SIP_JOIN: {
+	case OpHint::SJ: {
 		plan = make_unique<PhysicalSIPJoin>(context, op, move(left), move(right), move(op.conditions), op.join_type,
 		                                    op.left_projection_map, op.right_projection_map);
 		break;
 	}
-	case OpMark::MERGED_SIP_JOIN: {
+	case OpHint::MSJ: {
 		plan =
 		    make_unique<PhysicalMergeSIPJoin>(context, op, move(left), move(right), move(op.conditions), op.join_type,
 		                                      op.left_projection_map, op.right_projection_map, op.merge_projection_map);

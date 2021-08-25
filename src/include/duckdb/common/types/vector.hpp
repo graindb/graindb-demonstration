@@ -19,9 +19,6 @@ namespace duckdb {
 //! Type used for nullmasks
 typedef bitset<STANDARD_VECTOR_SIZE> nullmask_t;
 
-//! Zero NULL mask: filled with the value 0 [READ ONLY]
-extern nullmask_t ZERO_MASK;
-
 struct VectorData {
 	const SelectionVector *sel;
 	data_ptr_t data;
@@ -80,9 +77,9 @@ class Vector {
 public:
 	Vector();
 	//! Create a vector of size one holding the passed on value
-	Vector(Value value);
+	explicit Vector(Value value);
 	//! Create an empty standard vector with a type, equivalent to calling Vector(type, true, false)
-	Vector(TypeId type);
+	explicit Vector(TypeId type);
 	//! Create a non-owning vector that references the specified data
 	Vector(TypeId type, data_ptr_t dataptr);
 	//! Create an owning vector that holds at most STANDARD_VECTOR_SIZE entries.
@@ -234,7 +231,7 @@ struct FlatVector {
 	}
 	static inline void SetNullmask(Vector &vector, nullmask_t new_mask) {
 		assert(vector.vector_type == VectorType::FLAT_VECTOR);
-		vector.nullmask = move(new_mask);
+		vector.nullmask = new_mask;
 	}
 	static inline void SetNull(Vector &vector, idx_t idx, bool value) {
 		assert(vector.vector_type == VectorType::FLAT_VECTOR);
@@ -246,7 +243,6 @@ struct FlatVector {
 	}
 
 	static const sel_t incremental_vector[STANDARD_VECTOR_SIZE];
-	static sel_t mutable_incremental_vector[STANDARD_VECTOR_SIZE];
 	static const SelectionVector IncrementalSelectionVector;
 };
 
@@ -292,20 +288,18 @@ struct SequenceVector {
 
 class StandaloneVector : public Vector {
 public:
-	StandaloneVector() : Vector() {
+	StandaloneVector() : Vector(), count(0) {
 	}
-	StandaloneVector(TypeId type) : Vector(type) {
-	}
-	StandaloneVector(TypeId type, data_ptr_t dataptr) : Vector(type, dataptr) {
+	explicit StandaloneVector(TypeId type) : Vector(type), count(0) {
 	}
 
 public:
-	idx_t size() {
+	idx_t size() const {
 		return count;
 	}
-	void SetCount(idx_t count) {
-		assert(count <= STANDARD_VECTOR_SIZE);
-		this->count = count;
+	void SetCount(idx_t _count) {
+		assert(_count <= STANDARD_VECTOR_SIZE);
+		this->count = _count;
 	}
 
 protected:

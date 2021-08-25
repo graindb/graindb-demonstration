@@ -8,19 +8,18 @@
 
 #pragma once
 
-#include "duckdb/planner/expression.hpp"
-#include "duckdb/planner/bound_result_modifier.hpp"
 #include "duckdb/parser/query_node.hpp"
+#include "duckdb/planner/bound_result_modifier.hpp"
+#include "duckdb/planner/expression.hpp"
 
 namespace duckdb {
 
 //! Bound equivalent of QueryNode
 class BoundQueryNode {
 public:
-	BoundQueryNode(QueryNodeType type) : type(type) {
+	explicit BoundQueryNode(QueryNodeType type) : type(type) {
 	}
-	virtual ~BoundQueryNode() {
-	}
+	virtual ~BoundQueryNode() = default;
 
 	//! The type of the query node, either SetOperation or Select
 	QueryNodeType type;

@@ -17,16 +17,18 @@
 
 namespace duckdb {
 
-class ColumnStatistics;
 class DataTable;
 struct CreateTableInfo;
 struct BoundCreateTableInfo;
 
 struct RenameColumnInfo;
 struct AddColumnInfo;
+struct AddJoinIndexColumnInfo;
 struct RemoveColumnInfo;
 struct SetDefaultInfo;
 struct ChangeColumnTypeInfo;
+
+class EdgeCatalogEntry;
 
 //! A table catalog entry
 class TableCatalogEntry : public StandardEntry {
@@ -45,11 +47,16 @@ public:
 	vector<unique_ptr<BoundConstraint>> bound_constraints;
 	//! A map of column name to column index
 	unordered_map<string, column_t> name_map;
-	//! RAI column start index
-	column_t rai_column_index;
+	//! primary key index
+	column_t primary_key_column;
+	//! Map from join index rowid column to foreign key columns that are indexed
+	unordered_map<column_t, column_t> join_index_columns_map;
+	//! Edges that are on top of this table
+	vector<EdgeCatalogEntry *> correlated_edges;
 
 public:
-	void AddRAIColumns(vector<column_t> column_ids, vector<column_t> &update_columns);
+	//! Add new join index columns. Returns true if the join index column is added, false is it exists already.
+	vector<bool> AddJoinIndexColumns(vector<column_t> column_ids, vector<column_t> &update_columns);
 	unique_ptr<CatalogEntry> AlterEntry(ClientContext &context, AlterInfo *info) override;
 	//! Returns whether or not a column with the given name exists
 	bool ColumnExists(const string &name);
@@ -73,6 +80,8 @@ public:
 private:
 	unique_ptr<CatalogEntry> RenameColumn(ClientContext &context, RenameColumnInfo &info);
 	unique_ptr<CatalogEntry> AddColumn(ClientContext &context, AddColumnInfo &info);
+	// DEPRECATED
+	unique_ptr<CatalogEntry> AddJoinIndexColumn(ClientContext &context, AddJoinIndexColumnInfo &info);
 	unique_ptr<CatalogEntry> RemoveColumn(ClientContext &context, RemoveColumnInfo &info);
 	unique_ptr<CatalogEntry> SetDefault(ClientContext &context, SetDefaultInfo &info);
 	unique_ptr<CatalogEntry> ChangeColumnType(ClientContext &context, ChangeColumnTypeInfo &info);

@@ -30,6 +30,12 @@ enum class WALType : uint8_t {
 	DROP_SEQUENCE = 9,
 	SEQUENCE_VALUE = 10,
 
+	CREATE_EDGE = 11,
+	DROP_EDGE = 12,
+
+	CREATE_VERTEX = 13,
+	DROP_VERTEX = 14,
+
 	ALTER_INFO = 20,
 	// -----------------------------
 	// Data

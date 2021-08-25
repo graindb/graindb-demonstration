@@ -5,8 +5,6 @@
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/planner/expression/bound_function_expression.hpp"
 
-#include <iostream>
-
 using namespace duckdb;
 using namespace std;
 
@@ -14,7 +12,7 @@ namespace duckdb {
 
 class DependencyExtractor : public LogicalOperatorVisitor {
 public:
-	DependencyExtractor(unordered_set<CatalogEntry *> &dependencies) : dependencies(dependencies) {
+	explicit DependencyExtractor(unordered_set<CatalogEntry *> &dependencies) : dependencies(dependencies) {
 	}
 
 protected:
@@ -110,8 +108,10 @@ unique_ptr<PhysicalOperator> PhysicalPlanGenerator::CreatePlan(LogicalOperator &
 		return CreatePlan((LogicalCreateTable &)op);
 	case LogicalOperatorType::CREATE_INDEX:
 		return CreatePlan((LogicalCreateIndex &)op);
-	case LogicalOperatorType::CREATE_RAI:
-		return CreatePlan((LogicalCreateRAI &)op);
+	case LogicalOperatorType::CREATE_VERTEX:
+		return CreatePlan((LogicalCreateVertex &)op);
+	case LogicalOperatorType::CREATE_EDGE:
+		return CreatePlan((LogicalCreateEdge &)op);
 	case LogicalOperatorType::EXPLAIN:
 		return CreatePlan((LogicalExplain &)op);
 	case LogicalOperatorType::DISTINCT:

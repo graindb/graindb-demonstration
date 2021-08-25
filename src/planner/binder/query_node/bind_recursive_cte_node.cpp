@@ -1,7 +1,6 @@
 #include "duckdb/parser/expression/constant_expression.hpp"
-#include "duckdb/parser/expression_map.hpp"
-#include "duckdb/parser/query_node/select_node.hpp"
 #include "duckdb/parser/query_node/recursive_cte_node.hpp"
+#include "duckdb/parser/query_node/select_node.hpp"
 #include "duckdb/planner/binder.hpp"
 #include "duckdb/planner/query_node/bound_recursive_cte_node.hpp"
 #include "duckdb/planner/query_node/bound_select_node.hpp"
@@ -62,7 +61,7 @@ unique_ptr<BoundQueryNode> Binder::BindNode(RecursiveCTENode &statement) {
 		auto result_type = MaxSQLType(result->left->types[i], result->right->types[i]);
 		result->types.push_back(result_type);
 	}
-	if (statement.modifiers.size() > 0) {
+	if (!statement.modifiers.empty()) {
 		throw Exception("FIXME: bind modifiers in recursive CTE");
 	}
 

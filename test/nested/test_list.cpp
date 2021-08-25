@@ -1,20 +1,19 @@
 #include "catch.hpp"
-#include "duckdb/common/file_system.hpp"
 #include "dbgen.hpp"
-#include "test_helpers.hpp"
-
 #include "duckdb.hpp"
-#include "duckdb/parser/parsed_data/create_table_function_info.hpp"
-#include "duckdb/function/table_function.hpp"
-#include "duckdb/function/scalar_function.hpp"
-#include "duckdb/execution/operator/list.hpp"
 #include "duckdb/catalog/catalog_entry/list.hpp"
-#include "duckdb/function/function.hpp"
-#include "duckdb/planner/expression/list.hpp"
-#include "duckdb/parser/expression/function_expression.hpp"
-#include "duckdb/main/client_context.hpp"
+#include "duckdb/common/file_system.hpp"
+#include "duckdb/execution/operator/list.hpp"
 #include "duckdb/function/aggregate_function.hpp"
+#include "duckdb/function/function.hpp"
+#include "duckdb/function/scalar_function.hpp"
+#include "duckdb/function/table_function.hpp"
+#include "duckdb/main/client_context.hpp"
+#include "duckdb/parser/expression/function_expression.hpp"
 #include "duckdb/parser/parsed_data/create_aggregate_function_info.hpp"
+#include "duckdb/parser/parsed_data/create_table_function_info.hpp"
+#include "duckdb/planner/expression/list.hpp"
+#include "test_helpers.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -117,9 +116,9 @@ TEST_CASE("Test filter and projection of nested lists", "[nested]") {
 
 	result = con.Query("SELECT * FROM (SELECT LIST(a) l1 FROM (VALUES (1), (2), (3)) AS t1 (a)) t1, (SELECT LIST(b) l2 "
 	                   "FROM (VALUES (4), (5), (6), (7)) AS t2 (b)) t2");
-	REQUIRE(CHECK_COLUMN(result, 0, {Value::LIST({Value::INTEGER(1), Value::INTEGER(2), Value::INTEGER(3)})}));
-	REQUIRE(CHECK_COLUMN(result, 1,
+	REQUIRE(CHECK_COLUMN(result, 0,
 	                     {Value::LIST({Value::INTEGER(4), Value::INTEGER(5), Value::INTEGER(6), Value::INTEGER(7)})}));
+	REQUIRE(CHECK_COLUMN(result, 1, {Value::LIST({Value::INTEGER(1), Value::INTEGER(2), Value::INTEGER(3)})}));
 
 	result = con.Query("SELECT UNNEST(l1) u1, UNNEST(l2) u2 FROM (SELECT LIST(a) l1 FROM (VALUES (1), (2), (3)) AS t1 "
 	                   "(a)) t1, (SELECT LIST(b) l2 FROM (VALUES (4), (5), (6), (7)) AS t2 (b)) t2");

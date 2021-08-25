@@ -1,11 +1,7 @@
-#include "duckdb/planner/expression/bound_columnref_expression.hpp"
+#include "duckdb/planner/binder.hpp"
 #include "duckdb/planner/expression/bound_comparison_expression.hpp"
 #include "duckdb/planner/expression/bound_conjunction_expression.hpp"
 #include "duckdb/planner/expression/bound_constant_expression.hpp"
-#include "duckdb/planner/expression/bound_operator_expression.hpp"
-#include "duckdb/planner/expression/bound_subquery_expression.hpp"
-#include "duckdb/planner/expression_iterator.hpp"
-#include "duckdb/planner/binder.hpp"
 #include "duckdb/planner/operator/logical_any_join.hpp"
 #include "duckdb/planner/operator/logical_comparison_join.hpp"
 #include "duckdb/planner/operator/logical_cross_product.hpp"
@@ -77,14 +73,14 @@ unique_ptr<LogicalOperator> LogicalComparisonJoin::CreateJoin(JoinType type, uni
 		}
 		arbitrary_expressions.push_back(move(expr));
 	}
-	if (conditions.size() > 0) {
-		// we successfully convertedexpressions into JoinConditions
+	if (!conditions.empty()) {
+		// we successfully converted expressions into JoinConditions
 		// create a LogicalComparisonJoin
 		auto comp_join = make_unique<LogicalComparisonJoin>(type);
 		comp_join->conditions = move(conditions);
 		comp_join->children.push_back(move(left_child));
 		comp_join->children.push_back(move(right_child));
-		if (arbitrary_expressions.size() > 0) {
+		if (!arbitrary_expressions.empty()) {
 			// we have some arbitrary expressions as well
 			// add them to a filter
 			auto filter = make_unique<LogicalFilter>();
@@ -97,7 +93,7 @@ unique_ptr<LogicalOperator> LogicalComparisonJoin::CreateJoin(JoinType type, uni
 		}
 		return move(comp_join);
 	} else {
-		if (arbitrary_expressions.size() == 0) {
+		if (arbitrary_expressions.empty()) {
 			// all conditions were pushed down, add TRUE predicate
 			arbitrary_expressions.push_back(make_unique<BoundConstantExpression>(Value::BOOLEAN(true)));
 		}

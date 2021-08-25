@@ -18,6 +18,8 @@ class ClientContext;
 
 class StandardEntry;
 class TableCatalogEntry;
+class VertexCatalogEntry;
+class EdgeCatalogEntry;
 class TableFunctionCatalogEntry;
 class SequenceCatalogEntry;
 
@@ -30,6 +32,8 @@ struct CreateFunctionInfo;
 struct CreateCollationInfo;
 struct CreateViewInfo;
 struct BoundCreateTableInfo;
+struct BoundCreateVertexInfo;
+struct BoundCreateEdgeInfo;
 struct CreateSequenceInfo;
 struct CreateSchemaInfo;
 struct CreateTableFunctionInfo;
@@ -42,6 +46,10 @@ public:
 
 	//! The catalog set holding the tables
 	CatalogSet tables;
+	//! The catalog set holding the vertices
+	CatalogSet vertices;
+	//! The catalog set holding the edges
+	CatalogSet edges;
 	//! The catalog set holding the indexes
 	CatalogSet indexes;
 	//! The catalog set holding the table functions
@@ -56,6 +64,10 @@ public:
 public:
 	//! Creates a table with the given name in the schema
 	CatalogEntry *CreateTable(ClientContext &context, BoundCreateTableInfo *info);
+	//! Creates a vertex with the given name in the schema
+	CatalogEntry *CreateVertex(ClientContext &context, BoundCreateVertexInfo *info);
+	//! Creates an edge with the given name in the schema
+	CatalogEntry *CreateEdge(ClientContext &context, BoundCreateEdgeInfo *info);
 	//! Creates a view with the given name in the schema
 	CatalogEntry *CreateView(ClientContext &context, CreateViewInfo *info);
 	//! Creates a sequence with the given name in the schema

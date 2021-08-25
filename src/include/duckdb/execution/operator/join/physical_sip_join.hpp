@@ -2,11 +2,11 @@
 
 #include "duckdb/common/constants.hpp"
 #include "duckdb/common/types/chunk_collection.hpp"
+#include "duckdb/execution/index/rai/rel_adj_index.hpp"
 #include "duckdb/execution/operator/join/physical_comparison_join.hpp"
 #include "duckdb/execution/physical_operator.hpp"
 #include "duckdb/execution/sip_hashtable.hpp"
 #include "duckdb/planner/operator/logical_join.hpp"
-#include "duckdb/storage/rai.hpp"
 
 namespace duckdb {
 
@@ -29,7 +29,6 @@ public:
 
 private:
 	void InitializeAList();
-//	void InitializeBitMaskFilter();
 	void PassBitMaskFilter();
 	void ProbeHashTable(ClientContext &context, DataChunk &chunk, PhysicalOperatorState *state_);
 	void PerformSHJoin(ClientContext &context, DataChunk &chunk, PhysicalOperatorState *state_);

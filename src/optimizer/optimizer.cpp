@@ -64,25 +64,25 @@ unique_ptr<LogicalOperator> Optimizer::Optimize(unique_ptr<LogicalOperator> plan
 	context.profiler.EndPhase();
 
 	// check if filters match with existing indexes, if true transforms filters to index scans
-	context.profiler.StartPhase("index_scan");
-	IndexScan index_scan;
-	plan = index_scan.Optimize(move(plan));
-	context.profiler.EndPhase();
+	//	context.profiler.StartPhase("index_scan");
+	//	IndexScan index_scan;
+	//	plan = index_scan.Optimize(move(plan));
+	//	context.profiler.EndPhase();
 
 	context.profiler.StartPhase("in_clause");
-	InClauseRewriter rewriter(*this);
-	plan = rewriter.Rewrite(move(plan));
+	InClauseRewriter in_clause_rewriter(*this);
+	plan = in_clause_rewriter.Rewrite(move(plan));
 	context.profiler.EndPhase();
 
 	// then we extract common subexpressions inside the different operators
-	// context.profiler.StartPhase("common_subexpressions");
-	// CommonSubExpressionOptimizer cse_optimizer;
-	// cse_optimizer.VisitOperator(*plan);
-	// context.profiler.EndPhase();
+	//	context.profiler.StartPhase("common_subexpressions");
+	//	CommonSubExpressionOptimizer cse_optimizer;
+	//	cse_optimizer.VisitOperator(*plan);
+	//	context.profiler.EndPhase();
 
-	context.profiler.StartPhase("rai_join_rewrite");
-	SIPJoinRewriter rai_join_optimizer;
-	plan = rai_join_optimizer.Rewrite(move(plan));
+	context.profiler.StartPhase("sip_join_rewrite");
+	SIPJoinRewriter sip_join_optimizer;
+	plan = sip_join_optimizer.Rewrite(move(plan));
 	context.profiler.EndPhase();
 
 	context.profiler.StartPhase("unused_columns");
@@ -91,16 +91,16 @@ unique_ptr<LogicalOperator> Optimizer::Optimize(unique_ptr<LogicalOperator> plan
 	context.profiler.EndPhase();
 
 #if ENABLE_RAI_JOIN_MERGE
-	context.profiler.StartPhase("rai_join_merge");
-	SIPJoinMerger rai_join_merger;
-	plan = rai_join_merger.Rewrite(move(plan));
+	context.profiler.StartPhase("sip_join_merge");
+	SIPJoinMerger sip_join_merger;
+	plan = sip_join_merger.Rewrite(move(plan));
 	context.profiler.EndPhase();
 #endif
 
 	context.profiler.StartPhase("column_lifetime");
 	ColumnLifetimeAnalyzer column_lifetime(true);
 #if ENABLE_RAI_JOIN_MERGE
-	column_lifetime.column_ref_equivalence_cache = rai_join_merger.column_ref_equivalence_cache;
+	column_lifetime.column_ref_equivalence_cache = sip_join_merger.column_ref_equivalence_cache;
 #endif
 	column_lifetime.VisitOperator(*plan);
 	context.profiler.EndPhase();

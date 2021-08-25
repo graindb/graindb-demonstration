@@ -16,6 +16,9 @@ class CrossProductRef : public TableRef {
 public:
 	CrossProductRef() : TableRef(TableReferenceType::CROSS_PRODUCT) {
 	}
+	CrossProductRef(unique_ptr<TableRef> left, unique_ptr<TableRef> right)
+	    : TableRef(TableReferenceType::CROSS_PRODUCT), left(move(left)), right(move(right)) {
+	}
 
 	//! The left hand side of the cross product
 	unique_ptr<TableRef> left;

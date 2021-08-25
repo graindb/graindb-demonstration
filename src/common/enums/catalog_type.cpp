@@ -12,6 +12,10 @@ string CatalogTypeToString(CatalogType type) {
 		return "Collation";
 	case CatalogType::TABLE:
 		return "Table";
+	case CatalogType::VERTEX:
+		return "Vertex";
+	case CatalogType::EDGE:
+		return "Edge";
 	case CatalogType::SCHEMA:
 		return "Schema";
 	case CatalogType::TABLE_FUNCTION:
