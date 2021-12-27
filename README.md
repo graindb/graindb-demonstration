@@ -1,7 +1,5 @@
 # GRainDB
 
-![C/C++ CI](https://github.com/graindb/graindb-private/actions/workflows/ccpp.yml/badge.svg)
-
 GRainDB is a relation-graph database that extends DuckDB to support seamlessly querying of graph and tables.
 
 ### Requirements
@@ -19,7 +17,7 @@ After compiling, run `./build/release/tools/rest/duckdb_rest_server` in the proj
 to start it in the default mode.
 
 ### Web Server
-Please see the ![graindb-web](https://github.com/nafisaanzum13/graindb-web) repo.
+Please see the [graindb-web](https://github.com/nafisaanzum13/graindb-web) repo.
 
 ### Contact
 
